@@ -1,0 +1,35 @@
+name: 작업
+description: MVP 구현 작업을 등록합니다.
+title: "[AREA] "
+labels: ["P0"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 목표
+      description: 완료되어야 하는 결과를 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 완료 조건
+      placeholder: "- [ ] 실제 동작 기준"
+    validations:
+      required: true
+  - type: dropdown
+    id: owner
+    attributes:
+      label: 담당 영역
+      options:
+        - A-engine
+        - B-ai
+        - C-frontend
+        - integration
+    validations:
+      required: true
+  - type: textarea
+    id: dependency
+    attributes:
+      label: 의존성·영향 파일
+

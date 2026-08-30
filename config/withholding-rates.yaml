@@ -1,0 +1,15 @@
+withholding_references:
+  - income_type: business_personal_service
+    reference_rate: 0.033
+    includes_local_income_tax: true
+    requires_user_confirmation: true
+    source: "국세청"
+    checked_at: "2026-08"
+  - income_type: qualifying_other_income
+    reference_rate: 0.088
+    includes_local_income_tax: true
+    requires_user_confirmation: true
+    note: "모든 기타소득에 동일하게 적용되지 않음"
+    source: "국세청"
+    checked_at: "2026-08"
+

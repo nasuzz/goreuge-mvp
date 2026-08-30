@@ -1,0 +1,15 @@
+mvp_policy:
+  balance_scope: all_liquid_accounts
+  safety_buffer_months: 1.0
+  default_tax_reserve_rate: 0.12
+  tax_reserve_presets: [0.10, 0.12, 0.15]
+  wish_weekly_warning_ratio: 0.30
+  fixed_outflow_daily_divisor: 30
+  client_history_min_count: 3
+  cold_start_delay_days:
+    optimistic: 0
+    baseline: 7
+    pessimistic: 21
+  risk_status_overdue_days: 60
+  simulation_horizon_days: 90
+

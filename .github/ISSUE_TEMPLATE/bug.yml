@@ -1,0 +1,24 @@
+name: 버그
+description: 계산·AI·UI 오류를 보고합니다.
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: current
+    attributes:
+      label: 현재 동작
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 재현 절차
+    validations:
+      required: true
+

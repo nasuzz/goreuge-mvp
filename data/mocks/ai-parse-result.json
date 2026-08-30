@@ -1,0 +1,17 @@
+{
+  "clientName": "D에이전시",
+  "grossAmount": 2400000,
+  "completionDate": "2026-09-03",
+  "settlementTerm": "NEXT_MONTH_END",
+  "incomeTypeCandidate": "needs_review",
+  "confidence": {
+    "clientName": 0.92,
+    "grossAmount": 0.98,
+    "completionDate": 0.96,
+    "settlementTerm": 0.91,
+    "incomeTypeCandidate": 0.31
+  },
+  "missingFields": [],
+  "needsReview": true
+}
+

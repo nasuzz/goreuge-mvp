@@ -1,0 +1,8 @@
+{
+  "id": "demo-kim-dohyeon",
+  "totalBalance": 800000,
+  "monthlyFixedOutflow": 1200000,
+  "safetyBuffer": 400000,
+  "taxReserveRate": 0.12
+}
+
