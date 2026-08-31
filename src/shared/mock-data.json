@@ -1,0 +1,464 @@
+{
+  "_meta": {
+    "description": "고르게 MVP 공용 Mock 데이터. A·B·C 셋 다 이 파일 하나를 기준으로 작업한다.",
+    "today": "2026-09-01",
+    "note": "엔진은 Date.now()를 쓰지 않고 이 today를 주입받는다. 심사 중 날짜가 바뀌어도 D-day가 동일하게 나오게 하기 위함.",
+    "persona": "김도현, 31세, 영상편집 프리랜서 5년차. 잔액 80만원, 미수금 912만원.",
+    "verified": "이 데이터로 시뮬레이션을 실제 돌려 아래 expectedResults가 나오는 것을 확인함."
+  },
+  "expectedResults": {
+    "_comment": "A의 단위 테스트 기대값. 엔진이 이 숫자를 못 내면 버그다.",
+    "simulationStartBalance": 800000,
+    "dailyBaselineOutflow": 40000,
+    "outstandingReceivable": 9120000,
+    "dDay": {
+      "optimistic": {
+        "date": "2026-10-24",
+        "daysRemaining": 53
+      },
+      "baseline": {
+        "date": "2026-09-30",
+        "daysRemaining": 29
+      },
+      "pessimistic": {
+        "date": "2026-09-14",
+        "daysRemaining": 13
+      }
+    },
+    "weekly": {
+      "safeFund28Days": 60400,
+      "weeklyAvailableAmount": 15100
+    },
+    "demoBeats": {
+      "markContract002AsRisk": {
+        "before": "2026-09-30",
+        "after": "2026-09-14",
+        "daysEarlier": 16
+      },
+      "advancePayment500k": {
+        "before": "2026-09-30",
+        "after": "2026-10-13",
+        "daysRecovered": 13
+      },
+      "taxReserveCheck288k": {
+        "before": "2026-09-30",
+        "after": "2026-09-23",
+        "daysEarlier": 7,
+        "_note": "P1 적립 체크 구현 후 사용 가능한 세 번째 데모 비트"
+      }
+    },
+    "balanceLevel": {
+      "referenceAmount": 600000,
+      "_formula": "safetyBuffer=0이므로 monthlyFixedOutflow x 0.5",
+      "safe": ">= 600,000",
+      "caution": "180,000 ~ 600,000",
+      "danger": "< 180,000",
+      "baseline60Days": {
+        "safe": 7,
+        "caution": 18,
+        "danger": 35
+      },
+      "firstCaution": "2026-09-06",
+      "firstDanger": "2026-09-26"
+    }
+  },
+  "user": {
+    "id": "user-demo-01",
+    "totalBalance": 800000,
+    "monthlyFixedOutflow": 1200000,
+    "safetyBuffer": 0,
+    "_safetyBufferNote": "제안값은 1,200,000원(월 필수지출 1개월치)이지만 잔액 800,000원보다 커서 사용자가 '0원으로 시작'을 선택한 케이스. 기획서 3-3이 허용하는 선택지이며, 잔액이 한 달 지출보다 적은 프리랜서의 현실을 그대로 보여주는 데모 포인트다.",
+    "taxReserveRate": 0.12,
+    "createdAt": "2026-09-01T09:00:00+09:00",
+    "updatedAt": "2026-09-01T09:00:00+09:00"
+  },
+  "clients": [
+    {
+      "id": "client-001",
+      "name": "D에이전시",
+      "completedCount": 5,
+      "medianDelayDays": 5,
+      "p90DelayDays": 14
+    },
+    {
+      "id": "client-002",
+      "name": "K스튜디오",
+      "completedCount": 4,
+      "medianDelayDays": 12,
+      "p90DelayDays": 25
+    },
+    {
+      "id": "client-003",
+      "name": "M프로덕션",
+      "completedCount": 1,
+      "medianDelayDays": null,
+      "p90DelayDays": null
+    },
+    {
+      "id": "client-004",
+      "name": "신규 거래처",
+      "completedCount": 0,
+      "medianDelayDays": null,
+      "p90DelayDays": null
+    }
+  ],
+  "contracts": [
+    {
+      "_case": "대기 / 기획서 5-3 예시와 동일 / 예정일 2026-10-31은 토요일(주말 보정 테스트)",
+      "id": "contract-001",
+      "clientId": "client-001",
+      "grossAmount": 2400000,
+      "completionDate": "2026-09-03",
+      "invoiceDate": null,
+      "settlementTerm": "NEXT_MONTH_END",
+      "settlementDay": null,
+      "expectedDate": "2026-10-31",
+      "expectedDateSource": "calculated",
+      "actualDate": null,
+      "incomeType": "business_personal_service",
+      "classificationStatus": "user_confirmed",
+      "referenceRate": 0.033,
+      "confirmedExpectedRate": 0.033,
+      "actualRate": null,
+      "expectedNetAmount": 2320800,
+      "actualNetAmount": null,
+      "status": "waiting",
+      "statusSource": "system",
+      "statusReason": null,
+      "statusUpdatedAt": "2026-09-01T09:00:00+09:00",
+      "createdAt": "2026-08-20T09:00:00+09:00",
+      "updatedAt": "2026-09-01T09:00:00+09:00"
+    },
+    {
+      "_case": "지연 / 데모 1:35 클라이맥스 대상. 이 건을 위험으로 지정하면 기준 D-day가 16일 앞당겨진다",
+      "id": "contract-002",
+      "clientId": "client-002",
+      "grossAmount": 1200000,
+      "completionDate": "2026-07-20",
+      "invoiceDate": null,
+      "settlementTerm": "NEXT_MONTH_END",
+      "settlementDay": null,
+      "expectedDate": "2026-08-22",
+      "expectedDateSource": "calculated",
+      "actualDate": null,
+      "incomeType": "business_personal_service",
+      "classificationStatus": "user_confirmed",
+      "referenceRate": 0.033,
+      "confirmedExpectedRate": 0.033,
+      "actualRate": null,
+      "expectedNetAmount": 1160400,
+      "actualNetAmount": null,
+      "status": "delayed",
+      "statusSource": "system",
+      "statusReason": null,
+      "statusUpdatedAt": "2026-09-01T09:00:00+09:00",
+      "createdAt": "2026-07-10T09:00:00+09:00",
+      "updatedAt": "2026-09-01T09:00:00+09:00"
+    },
+    {
+      "_case": "위험(자동, 60일 초과) / 기준·비관 시나리오에서 유입 제외되는지 테스트",
+      "id": "contract-003",
+      "clientId": "client-003",
+      "grossAmount": 1800000,
+      "completionDate": "2026-05-15",
+      "invoiceDate": "2026-05-15",
+      "settlementTerm": "NET_DAYS",
+      "settlementDay": 30,
+      "expectedDate": "2026-06-14",
+      "expectedDateSource": "calculated",
+      "actualDate": null,
+      "incomeType": "business_personal_service",
+      "classificationStatus": "user_confirmed",
+      "referenceRate": 0.033,
+      "confirmedExpectedRate": 0.033,
+      "actualRate": null,
+      "expectedNetAmount": 1740600,
+      "actualNetAmount": null,
+      "status": "risk",
+      "statusSource": "system",
+      "statusReason": null,
+      "statusUpdatedAt": "2026-09-01T09:00:00+09:00",
+      "createdAt": "2026-05-01T09:00:00+09:00",
+      "updatedAt": "2026-09-01T09:00:00+09:00"
+    },
+    {
+      "_case": "추정 불가 / 소득유형 미확인 -> 유입 0원 + '추정 불가' 배지",
+      "id": "contract-004",
+      "clientId": "client-004",
+      "grossAmount": 1720000,
+      "completionDate": "2026-09-20",
+      "invoiceDate": null,
+      "settlementTerm": "NEXT_MONTH_DAY",
+      "settlementDay": 15,
+      "expectedDate": "2026-10-15",
+      "expectedDateSource": "calculated",
+      "actualDate": null,
+      "incomeType": "needs_review",
+      "classificationStatus": "needs_review",
+      "referenceRate": null,
+      "confirmedExpectedRate": null,
+      "actualRate": null,
+      "expectedNetAmount": null,
+      "actualNetAmount": null,
+      "status": "waiting",
+      "statusSource": "system",
+      "statusReason": null,
+      "statusUpdatedAt": "2026-09-01T09:00:00+09:00",
+      "createdAt": "2026-08-28T09:00:00+09:00",
+      "updatedAt": "2026-09-01T09:00:00+09:00"
+    },
+    {
+      "_case": "완료 / D-day 유입에 다시 포함하면 안 됨 (9-3 무결성 테스트)",
+      "id": "contract-005",
+      "clientId": "client-001",
+      "grossAmount": 1500000,
+      "completionDate": "2026-07-01",
+      "invoiceDate": null,
+      "settlementTerm": "NEXT_MONTH_END",
+      "settlementDay": null,
+      "expectedDate": "2026-08-31",
+      "expectedDateSource": "calculated",
+      "actualDate": "2026-08-25",
+      "incomeType": "business_personal_service",
+      "classificationStatus": "actual_confirmed",
+      "referenceRate": 0.033,
+      "confirmedExpectedRate": 0.033,
+      "actualRate": 0.033,
+      "expectedNetAmount": 1450500,
+      "actualNetAmount": 1450500,
+      "status": "completed",
+      "statusSource": "system",
+      "statusReason": null,
+      "statusUpdatedAt": "2026-08-25T14:00:00+09:00",
+      "createdAt": "2026-06-25T09:00:00+09:00",
+      "updatedAt": "2026-08-25T14:00:00+09:00"
+    },
+    {
+      "_case": "취소(사용자 수동) / 예상 유입 0원",
+      "id": "contract-006",
+      "clientId": "client-002",
+      "grossAmount": 900000,
+      "completionDate": "2026-09-10",
+      "invoiceDate": null,
+      "settlementTerm": "ON_COMPLETION",
+      "settlementDay": null,
+      "expectedDate": "2026-09-10",
+      "expectedDateSource": "calculated",
+      "actualDate": null,
+      "incomeType": "business_personal_service",
+      "classificationStatus": "user_confirmed",
+      "referenceRate": 0.033,
+      "confirmedExpectedRate": 0.033,
+      "actualRate": null,
+      "expectedNetAmount": 870300,
+      "actualNetAmount": null,
+      "status": "cancelled",
+      "statusSource": "user",
+      "statusReason": "클라이언트 프로젝트 중단 통보",
+      "statusUpdatedAt": "2026-08-29T11:00:00+09:00",
+      "createdAt": "2026-08-15T09:00:00+09:00",
+      "updatedAt": "2026-08-29T11:00:00+09:00"
+    },
+    {
+      "_case": "대기(장기) / 시뮬레이션 기간 끝자락 유입. 낙관 시나리오에도 D-day가 생기게 하는 균형추",
+      "id": "contract-007",
+      "clientId": "client-001",
+      "grossAmount": 2000000,
+      "completionDate": "2026-10-25",
+      "invoiceDate": null,
+      "settlementTerm": "NEXT_MONTH_DAY",
+      "settlementDay": 25,
+      "expectedDate": "2026-11-25",
+      "expectedDateSource": "calculated",
+      "actualDate": null,
+      "incomeType": "business_personal_service",
+      "classificationStatus": "user_confirmed",
+      "referenceRate": 0.033,
+      "confirmedExpectedRate": 0.033,
+      "actualRate": null,
+      "expectedNetAmount": 1934000,
+      "actualNetAmount": null,
+      "status": "waiting",
+      "statusSource": "system",
+      "statusReason": null,
+      "statusUpdatedAt": "2026-09-01T09:00:00+09:00",
+      "createdAt": "2026-08-30T09:00:00+09:00",
+      "updatedAt": "2026-09-01T09:00:00+09:00"
+    }
+  ],
+  "_receivableCheck": {
+    "설명": "페르소나 '완료했지만 아직 받지 못한 계약대금 912만원' 재현",
+    "계산": "2,400,000 + 1,200,000 + 1,800,000 + 1,720,000 + 2,000,000 = 9,120,000",
+    "제외": "contract-005 입금완료, contract-006 취소"
+  },
+  "outflows": [
+    {
+      "_case": "베이스라인에 이미 포함 -> 개별 차감하지 않음 (9-3 중복 차감 방지 테스트)",
+      "id": "outflow-001",
+      "kind": "월세",
+      "name": "월세",
+      "amount": 550000,
+      "dueDate": "2026-09-05",
+      "recurrence": "monthly",
+      "includedInBaseline": true
+    },
+    {
+      "_case": "베이스라인 미포함 -> 해당 날짜에 별도 차감. 매월 반복이므로 엔진이 90일치로 펼쳐야 함",
+      "id": "outflow-002",
+      "kind": "카드청구",
+      "name": "신용카드 결제",
+      "amount": 780000,
+      "dueDate": "2026-09-14",
+      "recurrence": "monthly",
+      "includedInBaseline": false
+    },
+    {
+      "id": "outflow-003",
+      "kind": "구독료",
+      "name": "어도비 CC",
+      "amount": 62000,
+      "dueDate": "2026-09-08",
+      "recurrence": "monthly",
+      "includedInBaseline": true
+    }
+  ],
+  "transactions": [
+    {
+      "id": "txn-001",
+      "amount": 12000,
+      "occurredAt": "2026-08-30T12:30:00+09:00",
+      "category": "식비",
+      "spendClass": "essential",
+      "note": null
+    },
+    {
+      "id": "txn-002",
+      "amount": 45000,
+      "occurredAt": "2026-08-29T21:10:00+09:00",
+      "category": "쇼핑",
+      "spendClass": "stress",
+      "note": "야근 후 충동구매"
+    },
+    {
+      "id": "txn-003",
+      "amount": 28000,
+      "occurredAt": "2026-08-27T19:00:00+09:00",
+      "category": "취미",
+      "spendClass": "hobby",
+      "note": null
+    }
+  ],
+  "savings": [
+    {
+      "_case": "P1 대상. 데모 기본값은 reservedAmount=0. 체크 실행 시 기준 D-day가 09-30 -> 09-23으로 7일 앞당겨진다(추가 데모 비트)",
+      "id": "saving-001",
+      "kind": "tax",
+      "name": "세금 준비금",
+      "targetAmount": null,
+      "weeklyAmount": null,
+      "plannedAmount": 288000,
+      "reservedAmount": 0,
+      "spentAmount": 0,
+      "status": "waiting"
+    },
+    {
+      "id": "saving-002",
+      "kind": "wish",
+      "name": "모니터 교체",
+      "targetAmount": 600000,
+      "weeklyAmount": 50000,
+      "plannedAmount": 0,
+      "reservedAmount": 0,
+      "spentAmount": 0,
+      "status": "waiting"
+    }
+  ],
+  "savingsChecks": [],
+  "aiCandidateExamples": [
+    {
+      "_case": "기획서 8-1 원문 예시. 거래처명 누락 + 소득유형 저신뢰",
+      "_input": "편집본은 9월 3일 납품이고 총 240만원이에요. 검수 끝나면 익월 말일에 지급할게요.",
+      "clientName": null,
+      "grossAmount": 2400000,
+      "completionDate": "2026-09-03",
+      "settlementTerm": "NEXT_MONTH_END",
+      "settlementDay": null,
+      "incomeTypeCandidate": "needs_review",
+      "confidence": {
+        "clientName": 0.0,
+        "grossAmount": 0.98,
+        "completionDate": 0.96,
+        "settlementTerm": 0.91,
+        "incomeTypeCandidate": 0.31
+      },
+      "missingFields": [
+        "clientName"
+      ],
+      "needsReview": true
+    },
+    {
+      "_case": "완료일 누락. 3일차 B·C 합동 세션 완료 기준 시나리오와 동일",
+      "_input": "K스튜디오 홍보영상 건 320만원으로 진행하시죠. 정산은 납품 후 30일이요.",
+      "clientName": "K스튜디오",
+      "grossAmount": 3200000,
+      "completionDate": null,
+      "settlementTerm": "NET_DAYS",
+      "settlementDay": 30,
+      "incomeTypeCandidate": "business_personal_service",
+      "confidence": {
+        "clientName": 0.94,
+        "grossAmount": 0.97,
+        "completionDate": 0.0,
+        "settlementTerm": 0.89,
+        "incomeTypeCandidate": 0.62
+      },
+      "missingFields": [
+        "completionDate"
+      ],
+      "needsReview": true
+    },
+    {
+      "_case": "정산조건 판단 불가 -> UNKNOWN -> 예정입금일 산출 불가",
+      "_input": "그 건은 250만원에 하시죠. 정산은 나중에 이야기해요.",
+      "clientName": null,
+      "grossAmount": 2500000,
+      "completionDate": null,
+      "settlementTerm": "UNKNOWN",
+      "settlementDay": null,
+      "incomeTypeCandidate": "needs_review",
+      "confidence": {
+        "clientName": 0.0,
+        "grossAmount": 0.95,
+        "completionDate": 0.0,
+        "settlementTerm": 0.12,
+        "incomeTypeCandidate": 0.2
+      },
+      "missingFields": [
+        "clientName",
+        "completionDate",
+        "settlementTerm"
+      ],
+      "needsReview": true
+    }
+  ],
+  "whatIfExamples": [
+    {
+      "_case": "기획서 6-1 원문 예시. 데모 2:00 구간. 실측 결과 13일 회복",
+      "type": "advance_payment",
+      "label": "선금 500,000원 9월 15일 입금 가정",
+      "amount": 500000,
+      "date": "2026-09-15"
+    },
+    {
+      "type": "delay_outflow",
+      "label": "카드 결제일 2주 연기",
+      "outflowId": "outflow-002",
+      "newDate": "2026-09-28"
+    },
+    {
+      "type": "reduce_spending",
+      "label": "월 지출 20만원 절감",
+      "monthlyReduction": 200000
+    }
+  ]
+}
