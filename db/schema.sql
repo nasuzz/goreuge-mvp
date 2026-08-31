@@ -1,48 +1,13 @@
 -- 고르게 MVP — Supabase(Postgres) 스키마
--- DRI: A(수경).  상태: 1일차 오전 확정본
+-- DRI: A(수경).  상태: PR 리뷰 반영본
 -- 기획서 9-1 "MVP 테이블 7개" + 확정 결정 D2(settlement_term), D1-a(expected_date_source)
 --
--- 적용: Supabase 대시보드 > SQL Editor에 그대로 붙여넣기
--- MVP는 인증을 건너뛰므로 RLS는 열어둔다. 실서비스 전환 시 반드시 잠글 것.
-
--- ⚠️ 재실행 주의
--- 이 파일은 한 번만 실행하는 것을 전제로 한다. 두 번째부터는
--- "type already exists" 에러가 난다. 처음부터 다시 만들려면
--- 아래 블록의 주석을 풀어서 먼저 실행할 것. (데이터 전부 삭제됨)
+-- 적용: Supabase 대시보드 > SQL Editor에 이 파일을 그대로 붙여넣기 (최초 1회)
+-- MVP는 인증을 건너뛰므로 RLS 정책이 전체 허용이다. 아래 "RLS" 절 필독.
 --
--- drop table if exists savings_checks, savings, transactions,
---                      outflows, contracts, clients, users cascade;
--- drop function if exists assert_reserved_within_checks() cascade;
--- drop function if exists touch_updated_at() cascade;
--- drop type if exists contract_status, classification_status, income_type,
---                     settlement_term, expected_date_source, status_source,
---                     outflow_recurrence, savings_kind, savings_status,
---                     spend_class cascade;
-
--- ── 재실행용 리셋 ────────────────────────────────────────
--- 스프린트 중 스키마를 여러 번 갈아엎게 되므로 idempotent하게 만든다.
--- 데이터가 전부 날아가므로 운영 환경에서는 절대 실행하지 말 것.
-drop table if exists savings_checks cascade;
-drop table if exists savings        cascade;
-drop table if exists transactions   cascade;
-drop table if exists outflows       cascade;
-drop table if exists contracts      cascade;
-drop table if exists clients        cascade;
-drop table if exists users          cascade;
-drop function if exists assert_reserved_within_checks() cascade;
-drop function if exists touch_updated_at()              cascade;
-drop type if exists contract_status       cascade;
-drop type if exists classification_status cascade;
-drop type if exists income_type           cascade;
-drop type if exists settlement_term       cascade;
-drop type if exists expected_date_source  cascade;
-drop type if exists status_source         cascade;
-drop type if exists outflow_recurrence    cascade;
-drop type if exists savings_kind          cascade;
-drop type if exists savings_status        cascade;
-drop type if exists spend_class           cascade;
-
--- ── enum 타입 ────────────────────────────────────────────
+-- ⚠️ 재실행하려면 이 파일이 아니라 반드시 reset.sql을 먼저 실행할 것.
+-- 이 파일 자체에는 DROP 구문이 없다. 두 번째 실행 시 "type already exists"가
+-- 나는 게 정상이며, 그건 안전장치다 — 실수로 프로덕션 데이터를 날리지 않기 위함.
 create type contract_status as enum
   ('waiting','delayed','risk','completed','cancelled');
 
@@ -247,8 +212,30 @@ create trigger trg_contracts_touch before update on contracts
 create trigger trg_savings_touch   before update on savings
   for each row execute function touch_updated_at();
 
--- ── RLS (MVP: 인증 스킵이므로 전면 허용) ─────────────────
--- 제출 후 실서비스 전환 시 반드시 user_id 기준으로 잠글 것.
+-- ── RLS ──────────────────────────────────────────────────
+--
+-- 🔴 [PR 리뷰 반영, 미확정 — B·C 승인 필요] 아래 정책은 RLS를 켠 것처럼
+-- 보이지만 using(true)/with check(true)라 사실상 전체 공개다.
+-- 배포된 프론트가 Supabase anon key로 직접 접근하면, 프로젝트 URL과
+-- anon key를 아는 사람은 누구나 모든 테이블을 읽고/쓰고/지울 수 있다.
+--
+-- 5일 MVP에서 가능한 선택지 3가지 — 팀 합의 후 아래 주석 결정을 지우고
+-- 실제로 선택한 방식만 남길 것. A 혼자 정할 사안이 아니다.
+--
+--   (a) Mock-only  : 이번 심사에서는 프론트가 DB를 아예 안 쓴다.
+--                    → 이 파일의 RLS 블록 자체를 실행하지 않거나,
+--                      배포 시 Supabase 연결을 보류한다. 5일 일정 기준 가장 안전.
+--   (b) 서버 전용   : 프론트는 자체 API 라우트(Next.js route handler 등)를
+--                    통해서만 DB에 접근하고, anon key는 클라이언트에 노출하지 않는다.
+--                    이 경우 RLS를 아래처럼 열어둬도 anon key 자체가 유출되지
+--                    않으므로 리스크가 줄어든다(그래도 service key 관리는 별도 주의).
+--   (c) 사용자별 정책: 실제 인증(Supabase Auth)을 붙이고 policy를
+--                    `using (user_id = auth.uid())`로 좁힌다. 5일 안에 하기엔 부담.
+--
+-- 결정 전까지는 (a) Mock-only를 기본값으로 간주한다.
+-- 아래 정책은 (b)/(c)로 갈 때를 대비한 틀만 남겨둔 것이며, 지금 이대로
+-- Supabase에 실행하고 anon key를 프론트에 노출하면 안 된다.
+
 alter table users          enable row level security;
 alter table clients        enable row level security;
 alter table contracts      enable row level security;
@@ -257,6 +244,7 @@ alter table transactions   enable row level security;
 alter table savings        enable row level security;
 alter table savings_checks enable row level security;
 
+-- ⚠️ 아래 정책은 전면 허용이다. (a) Mock-only로 간다면 이 블록을 실행하지 않는다.
 create policy mvp_open on users          for all using (true) with check (true);
 create policy mvp_open on clients        for all using (true) with check (true);
 create policy mvp_open on contracts      for all using (true) with check (true);

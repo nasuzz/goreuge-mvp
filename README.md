@@ -1,86 +1,229 @@
-# 고르게 (Goreuge)
+# 고르게 MVP — 공용 규격 최종본
 
-프리랜서·N잡러의 미수금 지연이 현금흐름에 미치는 영향을 계산하고, 언제까지 버틸 수 있는지 D-day로 보여주는 금융 AI Challenge MVP입니다.
+**DRI: A(수경)** · 1일차 오전 확정본 · 전 파일 컴파일·런타임 검증 완료
 
-> 아직 들어오지 않은 프로젝트 대금이 지연될 때, 나는 언제까지 버틸 수 있고 무엇을 바꿔야 하는가?
+---
 
-## 핵심 데모 흐름
-
-```text
-카톡·메일 계약 내용 입력
-→ AI 계약정보 후보 추출
-→ 사용자 확인·수정
-→ 계약 등록 및 예정입금일 계산
-→ 낙관·기준·비관 D-day 산출
-→ 정산 상태 변경 시 D-day 갱신
-→ 대응안별 +N일 비교
+```
+README.md                    ← 지금 이 파일. 제일 먼저 읽을 것
+package.json / tsconfig.json / tsconfig.build.json
+                              ← 아래 "직접 검증하기" 참고
+src/
+  shared/
+    enums.ts                   ← enum 14종
+    types.ts                   ← 테이블 7개 + 엔진 입출력 타입
+    policy.ts                  ← 정책 상수, 참조율, 반올림·색상 함수, 고정 문구
+    mock-data.json             ← 공용 Mock 원본 (직접 import 하지 말 것)
+    mock-data.ts               ← Mock 타입 안전 로더 (B·C는 이걸 import)
+    engine-interface.md        ← 엔진 함수 명세 + 계산 규칙 + 검증된 기대값 (A·C용 상세 스펙)
+test/
+  smoke.ts                   ← README 검증값을 저장소 안에서 재현하는 스모크 테스트
+db/
+  schema.sql                 ← Supabase 스키마 (최초 1회 실행용, 오늘 안 해도 됨, 3일차 전까지만)
+  reset.sql                  ← 개발 환경 초기화용. schema.sql과 분리됨. 프로덕션 금지
 ```
 
-## 5일 MVP 범위
+> ⚠️ 공용 코드는 `src/shared/`에 있습니다 (프로젝트 스캐폴딩이 `src/` 기준으로 구성됨).
+> 아래 예시의 `@/shared/...` import는 프론트엔드에서 `@/* → src/*` 별칭이 설정돼 있다는
+> 전제입니다. C의 프레임워크 설정(`tsconfig.json`의 `paths` 또는 `next.config`)에서
+> 이 별칭이 실제로 `src/`를 가리키는지 확인하세요. 안 맞으면 상대경로
+> `../../shared/mock-data` 식으로 바꿔야 합니다.
 
-### P0 — 실제 구현
+---
 
-- 온보딩: 전체 계좌 잔액, 월 필수지출, 안전예비금
-- 홈: D-day, 3개 시나리오, 주간 가용금액
-- 정산함: 대기·지연·위험, 계약 등록
-- AI 계약 텍스트 파싱 및 사용자 확인
-- 예정입금일과 예상 실수령액 계산
-- 정산 상태 변경에 따른 D-day 재계산
-- 대응안 가정 비교
-- 최소 월간 캘린더
+## 직접 검증하기
 
-### P1·P2 — 핵심 완료 후 또는 기획으로 제시
+README의 "검증 완료" 문구를 말로만 믿지 말고 저장소 안에서 직접 재현할 수 있습니다.
 
-- 위시 적립, 세금 봉투 전체 흐름
-- 누적 수입 확인 구간, 건강보험 알림
-- 3종 소비 분류와 버티기 모드
-- 공휴일 API, 계좌·카드 연동
-
-## 역할
-
-| 담당 | 역할 | 최종 책임 |
-|---|---|---|
-| A (수경) | 현금흐름 엔진·백엔드 | 공용 타입·DB·D-day 정확성 |
-| B (현수)| AI 파싱·합성데이터 | AI 출력 의미·평가 데이터 |
-| C (윤지) | 프론트엔드·통합 | 사용자 흐름·배포·제출물 |
-
-## 디렉터리
-
-```text
-src/engine/       A 소유
-src/ai/           B 소유
-src/components/   C 소유
-src/pages/        C 소유
-src/shared/       A 최종 관리, 공동 합의
-data/fixtures/    B 소유
-data/ground-truth/B 소유
-data/mocks/       C 소유, A·B 검수
-tests/            각 기능 담당
-docs/             C 총괄, A·B 검수
+```bash
+npm install
+npm run verify   # typecheck + mock import smoke test
 ```
 
-## 협업 규칙
+`typecheck`는 `src/shared/` 전체가 strict 모드로 컴파일되는지 확인하고,
+`smoke`는 `test/smoke.ts`를 실행해 README가 명시한 검증값(미수금 9,120,000원,
+기준 D-day 2026-09-30 등)이 실제로 재현되는지 확인합니다.
+프로젝트 스캐폴딩 PR이 별도로 있다면 그 구조에 맞춰 스크립트 경로만 조정하면 됩니다.
 
-- `main`은 항상 시연 가능한 상태로 유지합니다.
-- `feature/engine`, `feature/ai-parser`, `feature/frontend`에서 작업합니다.
-- 공용 타입 변경은 A가 최종 반영합니다.
-- AI 출력 변경은 B, UI 및 통합 변경은 C의 검토가 필요합니다.
-- API 키와 실제 개인정보는 커밋하지 않습니다.
-- 합성 데이터는 실제 사용자 데이터로 표현하지 않습니다.
-- 3일차 이후 공용 타입은 치명적 오류가 아니면 변경하지 않습니다.
+---
 
-## 문서
+## ⚠️ 시작 전 필수 — B·C 모두
 
-- [API 계약](docs/api-contract.md)
-- [업무 분담](docs/roles-and-schedule.md)
-- [MVP 최종 통합 명세](docs/mvp-spec-v3.md)
-- [합성 데이터 안내](docs/synthetic-data.md)
+```json
+// tsconfig.json에 이 옵션이 없으면 컴파일 안 됩니다
+{ "compilerOptions": { "resolveJsonModule": true, "strict": true } }
+```
 
-## 데이터 고지
+없으면 `Cannot find module './mock-data.json'` 에러가 납니다. (실제로 확인함)
 
-본 MVP는 개인정보 보호와 재현 가능한 기능 검증을 위해 실제 금융·메신저 데이터가 아닌 대표 페르소나 기반 합성 데이터를 사용합니다.
+---
 
-## 보안
+## B가 볼 파일
 
-`.env.example`을 복사하여 로컬 환경변수를 설정합니다. `.env` 파일과 API 키는 GitHub에 올리지 않습니다.
+1. `enums.ts` — `IncomeType`, `SettlementTerm` 값 목록. **이 값 외의 문자열을 출력하면 안 됨**
+2. `types.ts`의 `AIContractCandidate` — 만들어야 할 JSON 형태
+3. `policy.ts`의 `WITHHOLDING_REFERENCES` — 소득유형별 참조율 표
+4. `mock-data.json`의 `aiCandidateExamples` 3건 — 정답 데이터 형식 샘플
 
+> **절대 규칙**: `settlementTerm`은 6개 값 외 출력 금지 (모르면 `UNKNOWN`).
+> AI는 소득유형을 확정하지 않고 후보만 제시. `ai_candidate` 상태로는 DB 저장 불가(스키마가 막음).
+
+---
+
+## C가 볼 파일
+
+1. `mock-data.ts` — `import { MOCK, EXPECTED, TODAY } from "@/shared/mock-data"`
+2. `types.ts`, `enums.ts` — 화면에 뿌릴 필드와 상태값
+3. `policy.ts`의 `FIXED_COPY` — 화면에 그대로 박을 고정 문구
+4. `policy.ts`의 `getBalanceLevel` — 캘린더 3단계 배경색
+5. `engine-interface.md` 5장 — 나중에 부를 함수 6개
+
+**⚠️ 반드시 알아야 할 것 — `mock-data.json`을 직접 import하면 타입 에러가 5개 납니다**
+
+```ts
+// ✗ 이렇게 하면 터짐
+import raw from "@/shared/mock-data.json";
+const c: Contract[] = raw.contracts;
+//    Type 'string' is not assignable to type 'ContractStatus'
+
+// ○ 이렇게 쓰세요
+import { MOCK, EXPECTED, TODAY } from "@/shared/mock-data";
+MOCK.contracts               // Contract[] — 타입 완전히 맞음
+EXPECTED.dDay.baseline.date  // "2026-09-30"
+```
+
+JSON import는 문자열 리터럴을 `string`으로 넓혀버려서 enum 필드가 전부 깨집니다.
+`mock-data.ts`가 런타임 검증 + 타입 좁히기를 대신 해줍니다.
+Mock 데이터를 잘못 고치면 이 로더가 **어느 필드가 왜 틀렸는지** 알려주고 throw 합니다.
+
+> 대응안 버튼명은 `적용`이 아니라 `가정해 보기` / `시뮬레이션에 반영` (기획서 6-1).
+
+---
+
+## 확정 사항
+
+| # | 항목 | 확정 내용 |
+| --- | --- | --- |
+| D1 | 정산조건 값 목록 | `ON_COMPLETION` / `SAME_MONTH_END` / `NEXT_MONTH_END` / `NEXT_MONTH_DAY(+day)` / `NET_DAYS(+day)` / `UNKNOWN` **6개** |
+| D1-a | 예정입금일 수동 입력 | `expected_date_source` 필드 추가 (`calculated` \| `manual`) — **A가 추가 제안** |
+| D2 | contracts 컬럼 추가 | `settlement_term`, `settlement_day` |
+| D3 | 지연·위험 계약 시나리오 날짜 | 낙관 = 오늘 / 기준 = 오늘 + (중앙값 또는 7일) / 비관 = 오늘 + (p90 또는 21일) |
+| D5 | 저장소 | **Supabase** (Postgres, MVP는 인증 스킵) |
+| D7 | 잔액 3단계 기준 | safe ≥ 기준선 / caution ≥ 기준선×0.3 / danger 그 미만 **+ fallback 보정** |
+| D8 | 반올림 | 공제액 `Math.floor` / 베이스라인 내부 소수 유지 후 반환 시 반올림 / 나눗셈 `Math.floor` |
+| D10-A | 데모 안전예비금 | **0원** (기획서 3-3이 허용하는 "0원으로 시작") |
+| D10-B | 데모 대본 숫자 | 실측값으로 교체 (16일 / 13일) |
+| D11 | 데모 기준일 | `today = "2026-09-01"` 고정 주입 |
+
+---
+
+## D1 — 정산조건 6개로 충분한가
+
+**결론: 충분하다. 단, `expected_date_source`가 있어야 충분해진다.**
+
+6개로 커버 못 하는 실제 케이스가 세 가지 있다.
+
+| 케이스 | 빈도 | 처리 |
+| --- | --- | --- |
+| 선금/잔금 분할 지급 | 흔함 | **계약 2건으로 나눠 등록.** MVP는 1계약 = 1입금 |
+| 월 정액 리테이너 | 가끔 | MVP 범위 밖 |
+| 익익월 말일 등 변칙 | 드묾 | `UNKNOWN` → 사용자가 예정입금일 직접 입력 |
+
+분할 지급을 제대로 지원하려면 계약 1건에 입금 스케줄 여러 줄을 붙여야 해서
+테이블이 하나 더 생긴다. 5일 안에 할 일이 아니다. 2건 등록으로 우회한다.
+
+**`expected_date_source`를 추가한 이유**
+`UNKNOWN`이면 `expected_date`가 null이 되는데, 그 계약은 D-day 계산에서 영원히 빠진다.
+사용자가 직접 날짜를 넣을 수 있어야 하고, 그 값을 엔진이 재계산으로 덮어쓰면 안 된다.
+이 탈출구가 있어서 enum을 6개로 유지할 수 있다.
+
+> B에게 전달: **AI 프롬프트는 이 6개 값 외의 문자열을 절대 출력하지 않는다.**
+> 판단이 안 서면 `UNKNOWN`을 내보내고 `missingFields`에 `settlementTerm`을 넣는다.
+
+---
+
+## D7 — 원안 그대로 적용하면 깨진다
+
+원안:
+```
+safe    : 잔액 >= 안전예비금
+caution : 안전예비금 × 0.3 <= 잔액 < 안전예비금
+danger  : 잔액 < 안전예비금 × 0.3
+```
+
+데모 계정은 `safetyBuffer = 0`이다(D10-A). 대입하면:
+```
+safe    : 잔액 >= 0
+caution : 0 <= 잔액 < 0   ← 빈 구간
+danger  : 잔액 < 0
+```
+**caution이 사라져 3단계가 2단계로 무너진다.** 캘린더 색이 두 가지만 나온다.
+
+**보정: 기준선에 fallback을 둔다.**
+```
+referenceAmount = safetyBuffer > 0 ? safetyBuffer : monthlyFixedOutflow × 0.5
+```
+
+데모 계정 적용 결과 (기준선 600,000원):
+
+| 구간 | 범위 | 기준 시나리오 60일 |
+| --- | --- | --- |
+| safe | ≥ 600,000 | 7일 |
+| caution | 180,000 ~ 600,000 | 18일 |
+| danger | < 180,000 | 35일 |
+
+최초 caution 2026-09-06, 최초 danger 2026-09-26, D-day 2026-09-30.
+캘린더에 색이 자연스럽게 번지는 구간이 나온다.
+
+---
+
+## D10-A — 안전예비금을 0원으로 두는 이유
+
+페르소나는 잔액 800,000원, 월 필수지출 1,200,000원이다.
+안전예비금 제안값(월 필수지출 1개월치)은 1,200,000원으로 **잔액보다 크다.**
+
+제안값을 그대로 쓰면 `simulationStartBalance = -400,000원`이 되고,
+**D-day가 첫 화면부터 "오늘"로 고정된다.** 선금 가정을 해도 D-day가 안 움직여서
+데모 클라이맥스가 통째로 죽는다.
+
+실측 비교:
+
+| 안전예비금 | 낙관 | 기준 | 비관 |
+| --- | --- | --- | --- |
+| 1,200,000 (제안값) | 없음 | **D-0** | **D-0** |
+| 600,000 | 없음 | D-4 | D-4 |
+| 300,000 | 없음 | 없음 | D-12 |
+| **0 (확정)** | **D-53** | **D-29** | **D-13** |
+
+기획서 3-3이 "0원으로 시작"을 명시적으로 허용한다. 억지로 맞춘 게 아니다.
+온보딩에서 제안값 1,200,000원을 보여주고 사용자가 0원을 고르는 흐름을 데모에 넣으면
+"잔액이 한 달 지출보다 적은 프리랜서"라는 현실이 그대로 드러나 오히려 설득력이 는다.
+
+---
+
+## 아직 미확정 — B·C 확인 필요
+
+| # | 항목 | A 제안 | 확인 필요 이유 |
+| --- | --- | --- | --- |
+| D9 | `confidence` 필드 개수 | 5개 (거래처명 포함) | 프롬프트를 짤 B가 실제로 뽑을 수 있는지 확인 필요 |
+| — | 정산조건 6개를 LLM이 구분 가능한가 | — | "익월 말일" vs "당월 말일"을 실제 문장에서 헷갈리지 않는지 프롬프트 테스트 필요 |
+| — | **Supabase 연결 방식** | Mock-only (5일 일정 기준 가장 안전) | RLS를 켜도 `using(true)`면 anon key 노출 시 전체 공개. Mock-only / 서버 전용 / 사용자별 정책 중 택1 필요. `db/schema.sql`의 RLS 절 참고 |
+| — | 잔액 미입력(0원) 시 3단계 색상 fallback | `monthlyFixedOutflow × 0.5`를 기준선으로 대체 | A 단독 구현값. B·C도 이 기준이 화면·데모에 맞는지 확인 필요 |
+| — | 지연 계약 시나리오 날짜 규칙 | 오늘 기준으로 재계산 (D3) | 마찬가지로 A 단독 구현값. 팀 승인 필요 |
+
+> 위 5개 중 아래 3개(Supabase 연결 방식, fallback 기준선, 지연 날짜 규칙)는
+> **A가 이미 구현에 반영했지만 B·C의 정식 승인은 아직 없는 상태**입니다.
+> PR 코멘트나 이 표에 승인 여부를 남겨주세요.
+
+---
+
+## 공용 타입 변경 절차 (3일차 이후 잠금)
+
+```
+변경 요청자 / 변경 필드 / 변경 이유 / 영향받는 담당 / Mock 수정 필요 여부 / 적용 시점
+```
+
+1. 요청자가 변경안 작성 → 2. A가 계산·DB 영향 확인 → 3. B가 AI 영향 확인
+→ 4. C가 UI·Mock 영향 확인 → 5. A가 공용 타입에 반영 → 6. C가 Mock 갱신
+
+**3일차 이후에는 치명적 오류가 아니면 공용 필드를 변경하지 않습니다.**

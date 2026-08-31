@@ -1,0 +1,14 @@
+{
+  "name": "goreuge-shared",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsc -p tsconfig.build.json && node dist/test/smoke.js",
+    "verify": "npm run typecheck && npm run smoke"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^22.0.0"
+  }
+}
