@@ -5,7 +5,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "smoke": "tsc -p tsconfig.build.json && node dist/test/smoke.js",
-    "verify": "npm run typecheck && npm run smoke"
+    "test:ai": "tsc -p tsconfig.build.json && node dist/test/ai-evaluation.js",
+    "verify": "tsc --noEmit && tsc -p tsconfig.build.json && node dist/test/smoke.js && node dist/test/ai-evaluation.js"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
