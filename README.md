@@ -75,6 +75,7 @@ docs/             C 총괄, A·B 검수
 - [업무 분담](docs/roles-and-schedule.md)
 - [MVP 최종 통합 명세](docs/mvp-spec-v3.md)
 - [합성 데이터 안내](docs/synthetic-data.md)
+- [공용 규격 최종본](docs/shared-spec.md) — 공용 타입·enum·DB 스키마·D-day 계산 규칙·확정/미확정 결정 사항 (DRI: A)
 
 ## 데이터 고지
 
