@@ -3,6 +3,11 @@
 // DRI: A(수경)
 //
 // 핵심 원칙: 정시율을 금액에 곱하지 않는다. 금액은 유지하고 입금일만 이동한다.
+//
+// [이슈 #3 추가] diffDays — statusTransition.ts(경과일수 판정)와
+// whatIf.ts(D-day 변화량 계산)가 공통으로 쓰는 날짜 차 계산 함수.
+// 기존 simulate.ts의 로컬 daysBetween과 로직은 동일하되, 여러 파일이
+// 각자 재구현하지 않도록 여기로 옮겨 export한다.
 
 import type { Contract, Client, DateString } from "../shared/types";
 import type { Scenario, DelayBasis } from "../shared/enums";
@@ -24,6 +29,18 @@ export function addDays(date: DateString, days: number): DateString {
   const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(dt.getUTCDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
+}
+
+/**
+ * to - from 을 일 단위로 반환한다. (예: diffDays("2026-09-01", "2026-09-15") === 14)
+ * 양수면 to가 미래, 음수면 to가 과거.
+ */
+export function diffDays(from: DateString, to: DateString): number {
+  const [y1, m1, d1] = from.split("-").map(Number);
+  const [y2, m2, d2] = to.split("-").map(Number);
+  const a = Date.UTC(y1, m1 - 1, d1);
+  const b = Date.UTC(y2, m2 - 1, d2);
+  return Math.round((b - a) / 86_400_000);
 }
 
 function resolveDelay(
