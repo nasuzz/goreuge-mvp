@@ -10,5 +10,8 @@
     "noUnusedLocals": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/shared/**/*.ts"]
+  "include": [
+    "src/shared/**/*.ts",
+    "src/engine/**/*.ts"
+  ]
 }
