@@ -4,6 +4,7 @@ import type { AIContractCandidate } from "../src/shared/types";
 import { parseContractDeterministically, validateCandidate } from "../src/ai/contract-parser";
 import { parseContractWithFallback } from "../src/ai/parser-service";
 import { OpenAIContractProvider } from "../src/ai/openai-provider";
+import { getCandidateFieldReviews, getConfidenceTone, getConfirmationGate } from "../src/ai/review-rules";
 
 type Expected = Pick<
   AIContractCandidate,
@@ -78,6 +79,24 @@ async function main() {
     failures.push("OpenAI provider의 구조화 출력 연결이 동작하지 않았습니다.");
   }
 
+  if (getConfidenceTone(0.8) !== "normal" || getConfidenceTone(0.5) !== "warning" || getConfidenceTone(0.49) !== "danger") {
+    failures.push("confidence 3단계 경계값이 공용 정책과 일치하지 않습니다.");
+  }
+  const fieldReviews = getCandidateFieldReviews(mockAIOutput);
+  if (fieldReviews.length !== 5 || fieldReviews.some((field) => field.missing)) {
+    failures.push("확인 모달용 필드 상태 계산이 올바르지 않습니다.");
+  }
+  if (getConfirmationGate(mockAIOutput, false).canSave) {
+    failures.push("사용자 확인 전에는 저장이 차단되어야 합니다.");
+  }
+  if (!getConfirmationGate(mockAIOutput, true).canSave) {
+    failures.push("필수값이 있고 사용자가 확인한 후보는 저장 가능해야 합니다.");
+  }
+  const missingAmount = { ...mockAIOutput, grossAmount: null };
+  if (getConfirmationGate(missingAmount, true).canSave) {
+    failures.push("필수 금액 누락 시 저장이 차단되어야 합니다.");
+  }
+
   const accuracy = total === 0 ? 0 : correct / total;
   console.log("고르게 합성 데이터 기준 AI 파싱 평가");
   console.log(`- 평가 문장: ${dataset.cases.length}건`);
@@ -85,6 +104,7 @@ async function main() {
   console.log(`- 스키마 오류: ${invalidOutputs}건`);
   console.log(`- fallback: ${fallbackResult.source}`);
   console.log(`- OpenAI provider mock: ${aiResult.source}`);
+  console.log("- 확인 모달 규칙: confidence 경계·사용자 확인·필수값 차단 통과");
 
   if (failures.length > 0) {
     console.error("\n실패 항목");
