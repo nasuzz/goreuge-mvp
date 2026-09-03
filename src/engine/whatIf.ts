@@ -19,7 +19,7 @@
 
 import type {
   Contract, Client, EngineInput, CashflowResult,
-  WhatIfAssumption, WhatIfResult, DateString,
+  WhatIfAssumption, WhatIfResult, DateString, DateTimeString,
 } from "../shared/types";
 import { runScenario } from "./simulate";
 import { diffDays } from "./scenarioDate";
@@ -27,7 +27,17 @@ import { MVP_POLICY } from "../shared/policy";
 
 const VIRTUAL_CLIENT_ID = "whatif-advance-payment-client";
 
-export function compareWhatIf(input: EngineInput, assumptions: WhatIfAssumption[]): WhatIfResult[] {
+/**
+ * @param now 가상 계약의 createdAt/updatedAt/statusUpdatedAt에 찍을 시각(ISO 8601).
+ *   compareWhatIf 자체는 D-day 날짜 비교만 하므로 today만 있으면 계산은 가능하지만,
+ *   가상 Contract 객체를 만드는 이상 DateTimeString 필드엔 진짜 일시가 필요하다
+ *   (hsoo23 리뷰: statusTransition.ts와 동일한 DateString/DateTimeString 혼용 문제).
+ */
+export function compareWhatIf(
+  input: EngineInput,
+  assumptions: WhatIfAssumption[],
+  now: DateTimeString,
+): WhatIfResult[] {
   if (assumptions.length === 0) return [];
   if (assumptions.length > MVP_POLICY.maxWhatIfAssumptions) {
     throw new Error(
@@ -41,7 +51,7 @@ export function compareWhatIf(input: EngineInput, assumptions: WhatIfAssumption[
   return assumptions.map((assumption) => {
     // 원본을 절대 변경하지 않는다 — 가정마다 깨끗한 복사본에서 새로 시작.
     const modifiedInput = structuredClone(input);
-    applyAssumption(modifiedInput, assumption, input.today);
+    applyAssumption(modifiedInput, assumption, input.today, now);
 
     const after = runScenario(modifiedInput, "baseline");
 
@@ -56,9 +66,14 @@ export function compareWhatIf(input: EngineInput, assumptions: WhatIfAssumption[
 
 // ── 가정 반영 ──────────────────────────────────────────────
 
-function applyAssumption(input: EngineInput, assumption: WhatIfAssumption, today: DateString): void {
+function applyAssumption(
+  input: EngineInput,
+  assumption: WhatIfAssumption,
+  today: DateString,
+  now: DateTimeString,
+): void {
   if (assumption.type === "advance_payment") {
-    applyAdvancePayment(input, assumption, today);
+    applyAdvancePayment(input, assumption, today, now);
     return;
   }
   if (assumption.type === "delay_outflow") {
@@ -73,6 +88,7 @@ function applyAdvancePayment(
   input: EngineInput,
   assumption: Extract<WhatIfAssumption, { type: "advance_payment" }>,
   today: DateString,
+  now: DateTimeString,
 ): void {
   // clientId가 없는 가정이므로, 지연이 전혀 붙지 않는 가상 거래처를 하나 만든다.
   // (completedCount >= 3 → client_history 경로를 타되, medianDelayDays/p90DelayDays를
@@ -110,9 +126,10 @@ function applyAdvancePayment(
     status: "waiting",
     statusSource: "system",
     statusReason: null,
-    statusUpdatedAt: today,
-    createdAt: today,
-    updatedAt: today,
+    // [hsoo23 리뷰 반영] DateTimeString 필드엔 today가 아니라 now를 쓴다.
+    statusUpdatedAt: now,
+    createdAt: now,
+    updatedAt: now,
   };
   input.contracts.push(contract);
 }
