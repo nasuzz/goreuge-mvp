@@ -12,6 +12,11 @@ export {
   cancelContract,
   revertManualStatus,
 } from "./statusTransition";
-export { compareWhatIf, formatWhatIfMessage } from "./whatIf";
+export { compareWhatIf, formatWhatIfMessage, splitDelayedMonthlyOutflow } from "./whatIf";
 // WhatIfAssumption/WhatIfResult는 shared/types.ts가 원본이다 (whatIf.ts는 재정의하지 않음).
 export type { WhatIfAssumption, WhatIfResult } from "../shared/types";
+
+// [이슈 #14 추가]
+export { calculateExpectedDate } from "./expectedDate";
+export { calculateExpectedNetAmount } from "./expectedNetAmount";
+export type { ExpectedNetAmountResult } from "./expectedNetAmount";

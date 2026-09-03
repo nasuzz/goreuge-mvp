@@ -18,7 +18,7 @@
 //   client-001 이력을 태우는 방식) 이 부분을 바꿔야 한다 — B·C 확인 요망.
 
 import type {
-  Contract, Client, EngineInput, CashflowResult,
+  Contract, Client, Outflow, EngineInput, CashflowResult,
   WhatIfAssumption, WhatIfResult, DateString, DateTimeString,
 } from "../shared/types";
 import { runScenario } from "./simulate";
@@ -77,7 +77,7 @@ function applyAssumption(
     return;
   }
   if (assumption.type === "delay_outflow") {
-    applyDelayOutflow(input, assumption);
+    applyDelayOutflow(input, assumption, today);
     return;
   }
   // reduce_spending
@@ -137,15 +137,79 @@ function applyAdvancePayment(
 function applyDelayOutflow(
   input: EngineInput,
   assumption: Extract<WhatIfAssumption, { type: "delay_outflow" }>,
+  today: DateString,
 ): void {
-  const outflow = input.outflows.find((o) => o.id === assumption.outflowId);
-  if (!outflow) {
+  const idx = input.outflows.findIndex((o) => o.id === assumption.outflowId);
+  if (idx === -1) {
     throw new Error(`[engine] compareWhatIf: outflow ${assumption.outflowId}를 찾을 수 없습니다`);
   }
-  // newDate는 절대 날짜다. recurrence === "monthly"인 outflow의 dueDate를 바꾸면
-  // 이후 매달 발생분의 기준일(day-of-month)도 함께 밀린다는 점에 유의 —
-  // "이번 한 번만 미루기"가 필요해지면(P1/P2) outflow를 분리 등록하는 방식으로 바꿔야 한다.
-  outflow.dueDate = assumption.newDate;
+  const outflow = input.outflows[idx];
+
+  if (outflow.recurrence === "once") {
+    // 단발성 유출은 그 날 하루뿐이라 dueDate만 옮기면 끝.
+    input.outflows[idx] = { ...outflow, dueDate: assumption.newDate };
+    return;
+  }
+
+  // [hsoo23 리뷰 반영] recurrence === "monthly"인 항목의 dueDate를 그대로 newDate로
+  // 바꾸면 outflowSchedule.ts가 그 "일(day)"을 앵커로 매달 다시 펼친다 — 9/14 카드값을
+  // 9/21로 미루는 가정이 10/21, 11/21까지 전부 밀려버려서 D-day 개선폭이 과대 계산된다.
+  // outflowSchedule.ts(#2 소관)는 건드리지 않고, 여기서 "이번 회차 1건(once)"과
+  // "다음 회차부터 이어지는 monthly"로 분리해서 이번 한 번만 옮긴다.
+  const [split1, split2] = splitDelayedMonthlyOutflow(outflow, assumption.newDate, today);
+  input.outflows.splice(idx, 1, split1, split2);
+}
+
+/**
+ * monthly outflow를 "이번에 미루는 1건(once, newDate)"과
+ * "다음 회차부터는 원래 일자를 유지하는 monthly"로 분리한다.
+ * outflowSchedule.ts의 필터가 `candidate >= o.dueDate`라는 점을 이용 —
+ * continuing 항목의 dueDate를 "다음 회차"로 두면 이번 회차(원래 일자)는 자동으로 제외되고
+ * targetDay(=day-of-month)는 원본 그대로 유지되어 그 다음 회차부터 정상적으로 이어진다.
+ * (테스트에서 직접 검증할 수 있도록 export한다.)
+ */
+export function splitDelayedMonthlyOutflow(
+  outflow: Outflow,
+  newDate: DateString,
+  today: DateString,
+): [Outflow, Outflow] {
+  const anchorDay = Number(outflow.dueDate.split("-")[2]);
+  const nextOccurrence = nextMonthlyOccurrenceOnOrAfter(outflow.dueDate, today);
+  const followingOccurrence = occurrenceInMonthOffset(nextOccurrence, anchorDay, 1);
+
+  const delayedOnce: Outflow = {
+    ...outflow,
+    id: `${outflow.id}-whatif-delayed-once`,
+    recurrence: "once",
+    dueDate: newDate,
+  };
+  const continuingMonthly: Outflow = {
+    ...outflow,
+    id: `${outflow.id}-whatif-continuing`,
+    recurrence: "monthly",
+    dueDate: followingOccurrence,
+  };
+  return [delayedOnce, continuingMonthly];
+}
+
+/** anchorDueDate의 day-of-month를 기준으로, today 이후 가장 가까운 발생일(clamp 포함) */
+function nextMonthlyOccurrenceOnOrAfter(anchorDueDate: DateString, today: DateString): DateString {
+  const anchorDay = Number(anchorDueDate.split("-")[2]);
+  const thisMonth = occurrenceInMonthOffset(today, anchorDay, 0);
+  if (thisMonth >= today) return thisMonth;
+  return occurrenceInMonthOffset(today, anchorDay, 1);
+}
+
+/** baseDate가 속한 달 기준 monthOffset만큼 이동한 달의 day일 (그 달 일수 초과 시 말일로 clamp) */
+function occurrenceInMonthOffset(baseDate: DateString, day: number, monthOffset: number): DateString {
+  const [y, m] = baseDate.split("-").map(Number);
+  let year = y;
+  let month = m + monthOffset;
+  while (month < 1) { month += 12; year -= 1; }
+  while (month > 12) { month -= 12; year += 1; }
+  const daysInTarget = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const clampedDay = Math.min(day, daysInTarget);
+  return `${year}-${String(month).padStart(2, "0")}-${String(clampedDay).padStart(2, "0")}`;
 }
 
 function applyReduceSpending(
