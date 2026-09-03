@@ -32,27 +32,27 @@ export function recalculateContractStatus(contract: Contract, today: DateString)
   // 종료 상태(완료/취소)는 자동 전이 대상이 아니다.
   if (contract.status === "completed" || contract.status === "cancelled") return contract;
 
+  // 이미 risk인 계약(system)은 더 갈 곳이 없다 — 이 함수가 다루는 전이 대상은 waiting/delayed뿐.
+  if (contract.status !== "waiting" && contract.status !== "delayed") return contract;
+
   // expectedDate가 없으면(UNKNOWN 정산조건 등) 경과 판정 자체가 불가능 — 상태 유지.
   if (contract.expectedDate === null) return contract;
 
   const overdueDays = diffDays(contract.expectedDate, today);
 
-  if (contract.status === "waiting") {
-    // 예정일이 아직 안 지났으면(overdueDays <= 0) 대기 유지.
-    if (overdueDays > 0) {
-      return transitionTo(contract, "delayed", "system", null, today);
-    }
-    return contract;
+  // [hsoo23 리뷰 반영] 60일 이상 경과는 waiting이든 delayed든 "즉시" risk로 보낸다.
+  // waiting → delayed → risk 를 재계산 호출 두 번에 걸쳐 순차적으로만 전이시키면,
+  // 화면이 재계산을 한 번만 호출하는 경우 이미 60일 넘게 지난 계약이 delayed로만
+  // 표시되는 채로 남는다(실제로는 risk여야 함). delayed를 거칠 필요 없이 한 번에 판정한다.
+  if (overdueDays >= MVP_POLICY.riskStatusOverdueDays) {
+    return transitionTo(contract, "risk", "system", null, today);
   }
 
-  if (contract.status === "delayed") {
-    if (overdueDays >= MVP_POLICY.riskStatusOverdueDays) {
-      return transitionTo(contract, "risk", "system", null, today);
-    }
-    return contract;
+  if (contract.status === "waiting" && overdueDays > 0) {
+    return transitionTo(contract, "delayed", "system", null, today);
   }
 
-  // status === "risk"(system)인데 여기 또 들어온 경우 — 이미 위험이므로 유지.
+  // waiting인데 아직 예정일 전이거나, delayed인데 아직 60일 미만이면 상태 유지.
   return contract;
 }
 
