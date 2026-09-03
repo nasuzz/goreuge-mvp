@@ -59,6 +59,22 @@ function projectContractInflow(
     };
   }
 
+  // [hsoo23 리뷰 반영] 사용자 확인 전(needs_review/ai_candidate) 계약은 expectedNetAmount에
+  // 값이 들어있어도(데이터 오류로 잘못 채워졌더라도) 유입에 포함하지 않는다.
+  // DB도 needs_review 저장 자체는 허용하고(ai_candidate만 chk_no_unconfirmed_save로 막음),
+  // Contract 타입도 "needs_review인데 expectedNetAmount가 non-null"인 조합을 막지 않으므로
+  // 이 함수가 명시적으로 방어한다.
+  if (
+    contract.classificationStatus === "needs_review" ||
+    contract.classificationStatus === "ai_candidate"
+  ) {
+    return {
+      ...base, date: null, amount: 0, netAmountStatus: "unavailable",
+      delayBasis: "client_history", delayDays: 0,
+      excludedReason: "사용자 확인 전 계약 — 유입에 반영하지 않음",
+    };
+  }
+
   // 실수령액을 추정할 수 없으면 시나리오와 무관하게 0원 + 사유 표시.
   if (contract.expectedNetAmount === null) {
     return {
