@@ -1,5 +1,5 @@
-import path from "node:path";
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const nextConfig: NextConfig = {
   // Turbopack does not resolve files outside the project root
