@@ -120,32 +120,32 @@ console.log("\n── settlementDay 필수/범위 검증 ──");
 console.log("\n── calculateExpectedNetAmount: actual > calculated > unavailable 우선순위 ──");
 check(
   "actualNetAmount 있으면 actual 최우선 (confirmedExpectedRate 있어도)",
-  calculateExpectedNetAmount({ grossAmount: 2400000, confirmedExpectedRate: 0.033, actualNetAmount: 2200000 }),
+  calculateExpectedNetAmount({ grossAmount: 2400000, payerStatedNetAmount: null, confirmedExpectedRate: 0.033, actualNetAmount: 2200000 }),
   { amount: 2200000, status: "actual" },
 );
 check(
   "confirmedExpectedRate로 계산 (2,400,000 * 3.3% = 79,200 내림 -> 2,320,800)",
-  calculateExpectedNetAmount({ grossAmount: 2400000, confirmedExpectedRate: 0.033, actualNetAmount: null }),
+  calculateExpectedNetAmount({ grossAmount: 2400000, payerStatedNetAmount: null, confirmedExpectedRate: 0.033, actualNetAmount: null }),
   { amount: 2320800, status: "calculated" },
 );
 check(
   "confirmedExpectedRate null이면 무조건 unavailable (referenceRate 대체 없음, 5-1 원칙)",
-  calculateExpectedNetAmount({ grossAmount: 2400000, confirmedExpectedRate: null, actualNetAmount: null }),
+  calculateExpectedNetAmount({ grossAmount: 2400000, payerStatedNetAmount: null, confirmedExpectedRate: null, actualNetAmount: null }),
   { amount: null, status: "unavailable" },
 );
 check(
   "공제율 0%(no_withholding)도 정상 계산",
-  calculateExpectedNetAmount({ grossAmount: 500000, confirmedExpectedRate: 0, actualNetAmount: null }),
+  calculateExpectedNetAmount({ grossAmount: 500000, payerStatedNetAmount: null, confirmedExpectedRate: 0, actualNetAmount: null }),
   { amount: 500000, status: "calculated" },
 );
 check(
   "공제율 8.8%(기타소득) 내림 계산 (1,000,000 * 0.088 = 88,000)",
-  calculateExpectedNetAmount({ grossAmount: 1000000, confirmedExpectedRate: 0.088, actualNetAmount: null }),
+  calculateExpectedNetAmount({ grossAmount: 1000000, payerStatedNetAmount: null, confirmedExpectedRate: 0.088, actualNetAmount: null }),
   { amount: 912000, status: "calculated" },
 );
 check(
   "actualNetAmount가 0이어도(전액 공제) actual로 인정 — null이 아니면 actual",
-  calculateExpectedNetAmount({ grossAmount: 500000, confirmedExpectedRate: 0.1, actualNetAmount: 0 }),
+  calculateExpectedNetAmount({ grossAmount: 500000, payerStatedNetAmount: null, confirmedExpectedRate: 0.1, actualNetAmount: 0 }),
   { amount: 0, status: "actual" },
 );
 

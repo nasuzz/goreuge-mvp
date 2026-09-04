@@ -1,5 +1,5 @@
 -- 고르게 MVP — Supabase(Postgres) 스키마
--- DRI: A(수경).  상태: PR 리뷰 반영본
+-- DRI: A(수경).  상태: PR 리뷰 반영본 (+이슈 #16: payer_stated_net_amount 추가)
 -- 기획서 9-1 "MVP 테이블 7개" + 확정 결정 D2(settlement_term), D1-a(expected_date_source)
 --
 -- 적용: Supabase 대시보드 > SQL Editor에 이 파일을 그대로 붙여넣기 (최초 1회)
@@ -8,6 +8,18 @@
 -- ⚠️ 재실행하려면 이 파일이 아니라 반드시 reset.sql을 먼저 실행할 것.
 -- 이 파일 자체에는 DROP 구문이 없다. 두 번째 실행 시 "type already exists"가
 -- 나는 게 정상이며, 그건 안전장치다 — 실수로 프로덕션 데이터를 날리지 않기 위함.
+--
+-- ⚠️ [이슈 #16] 이미 schema.sql을 실행해서 테이블이 있는 환경에서는 이 파일 재실행이 아니라
+-- 아래 마이그레이션을 SQL Editor에서 별도로 실행해야 한다:
+--
+--   alter table contracts add column payer_stated_net_amount bigint;
+--   alter table contracts drop constraint chk_net_le_gross;
+--   alter table contracts add constraint chk_net_le_gross check (
+--     (expected_net_amount is null or expected_net_amount <= gross_amount)
+--     and (actual_net_amount is null or actual_net_amount <= gross_amount)
+--     and (payer_stated_net_amount is null or payer_stated_net_amount <= gross_amount)
+--   );
+--
 create type contract_status as enum
   ('waiting','delayed','risk','completed','cancelled');
 
@@ -88,6 +100,11 @@ create table contracts (
   confirmed_expected_rate numeric(5,4),
   actual_rate             numeric(5,4),
 
+  -- [이슈 #16] 지급처가 알려준 정확한 금액. rate 환산 없이 원 단위 그대로 저장한다 —
+  -- confirmed_expected_rate가 numeric(5,4)라 임의 금액을 rate로 역산/왕복하면 원 단위
+  -- 오차가 난다(실측 최대 241원). 있으면 confirmed_expected_rate 계산보다 우선한다.
+  payer_stated_net_amount bigint,
+
   expected_net_amount     bigint,
   actual_net_amount       bigint,
 
@@ -117,6 +134,7 @@ create table contracts (
   constraint chk_net_le_gross check (
     (expected_net_amount is null or expected_net_amount <= gross_amount)
     and (actual_net_amount is null or actual_net_amount <= gross_amount)
+    and (payer_stated_net_amount is null or payer_stated_net_amount <= gross_amount)
   )
 );
 create index idx_contracts_user     on contracts(user_id);

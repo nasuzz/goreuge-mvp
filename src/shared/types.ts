@@ -77,6 +77,13 @@ export interface Contract {
   /** 실제 입금액으로 역산(5-3). (총액-실수령액) / 총액 */
   actualRate: Rate | null;
 
+  /** [이슈 #16] 지급처가 직접 알려준 정확한 금액(예: "공제액 79,200원"). rate로 환산해
+   * confirmedExpectedRate에 넣지 않는다 — DB의 confirmed_expected_rate가 numeric(5,4)라
+   * 왕복 시 원 단위 오차가 난다(실측: 임의 금액 기준 최대 241원 차). 있으면
+   * confirmedExpectedRate 계산보다 우선한다. 반드시 null로 명시할 것(undefined 금지 —
+   * mock-data.ts validateIntegrity가 검사한다). */
+  payerStatedNetAmount: Won | null;
+
   /** 잠정 실수령액. confirmedExpectedRate 없으면 null -> "추정 불가" 배지 */
   expectedNetAmount: Won | null;
   actualNetAmount: Won | null;
@@ -286,6 +293,8 @@ export interface ContractCreateInput {
   incomeType: IncomeType;
   /** user_confirmed 미만이면 저장 거부 */
   classificationStatus: Extract<ClassificationStatus, "user_confirmed">;
+  /** [이슈 #16] 지급처가 알려준 금액. 있으면 confirmedExpectedRate보다 우선 적용됨 */
+  payerStatedNetAmount: Won | null;
   confirmedExpectedRate: Rate | null;
 }
 
