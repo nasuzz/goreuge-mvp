@@ -77,7 +77,8 @@ export type DelayBasis =
 
 /** 실수령액 산출 가능 여부 */
 export type NetAmountStatus =
-  | "calculated"   // 사용자 확인 공제율로 잠정 산출
+  | "calculated"   // 지급처 안내 금액 또는 사용자 확인 공제율로 산출.
+                   // 둘 중 어느 쪽인지는 payerStatedNetAmount가 null인지로 가른다(이슈 #16)
   | "actual"       // 실제 입금으로 확정
   | "unavailable"; // "추정 불가" 배지 대상
 

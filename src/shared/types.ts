@@ -86,7 +86,8 @@ export interface Contract {
    * 금지 — mock-data.ts validateIntegrity가 검사한다). */
   payerStatedNetAmount: Won | null;
 
-  /** 잠정 실수령액. confirmedExpectedRate 없으면 null -> "추정 불가" 배지 */
+  /** 잠정 실수령액. payerStatedNetAmount와 confirmedExpectedRate가 둘 다 없을 때만
+   * null -> "추정 불가" 배지. 지급처 안내 금액만 있어도 값이 나온다(이슈 #16) */
   expectedNetAmount: Won | null;
   actualNetAmount: Won | null;
 
