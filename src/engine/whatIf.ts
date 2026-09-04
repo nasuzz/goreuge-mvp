@@ -121,6 +121,7 @@ function applyAdvancePayment(
     referenceRate: 0,
     confirmedExpectedRate: 0,
     actualRate: null,
+    payerStatedNetAmount: null,
     expectedNetAmount: assumption.amount,
     actualNetAmount: null,
     status: "waiting",

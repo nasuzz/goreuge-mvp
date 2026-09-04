@@ -81,6 +81,7 @@ console.log("── 데모 비트 2: 선금 500,000원 9/15 입금 가정 ──
     actualRate: null,
     expectedNetAmount: 500000,
     actualNetAmount: null,
+    payerStatedNetAmount: null,
     status: "waiting",
     statusSource: "system",
     statusReason: null,
