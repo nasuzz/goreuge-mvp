@@ -137,22 +137,45 @@ function calculateScenarioDate(
 
 ```ts
 function calculateExpectedNetAmount(
-  contract: Contract,
+  contract: Pick<Contract,
+    "grossAmount" | "payerStatedNetAmount" | "confirmedExpectedRate" | "actualNetAmount">,
 ): { amount: Won | null; status: NetAmountStatus };
 ```
 
-```
-예상 실수령액 = 계약 총액 - Math.floor(총액 × confirmedExpectedRate)
-```
+**우선순위 (이슈 #16 확정. 기획서 4-3과 같은 순서다)**
 
-우선순위(4-3):
-1. 지급처가 안내한 공제액이 있으면 **그 값 최우선**
-2. 사용자가 소득유형·참조율 적용을 확인했으면 → 시스템 참조율로 잠정 산출
-3. 실제 입금 확인 후 → 잠정값 폐기, 실제값으로 갱신
-4. 어느 것도 없으면 → `status: "unavailable"`, `추정 불가` 배지
+| 순위 | 조건 | amount | status |
+| --- | --- | --- | --- |
+| 1 | `actualNetAmount !== null` | 그 값 | `actual` |
+| 2 | `payerStatedNetAmount !== null` | **그 값 그대로** | `calculated` |
+| 3 | `confirmedExpectedRate !== null` | `총액 - Math.floor(총액 × confirmedExpectedRate)` | `calculated` |
+| 4 | 그 외 | `null` | `unavailable` |
+
+2순위는 지급처가 **실수령액을 금액으로 직접 안내한 경우**다(`payerStatedNetAmount: Won | null`).
+3순위와 달리 사용자가 참조율을 승인하지 않아도 값이 나온다.
+
+⚠️ **지급처가 안내한 금액을 rate로 환산해 `confirmedExpectedRate`에 넣지 않는다.**
+DB의 `confirmed_expected_rate`가 `numeric(5,4)`라 왕복 시 원 단위가 어긋난다
+(B 실측: 임의 금액 기준 최대 241원 차). 그래서 출처 enum이 아니라 Won 필드를 따로 뒀다.
+
+⚠️ **`payerStatedNetAmount`는 공제액이 아니라 실수령액이다.** AI 파서(B)가
+`"공제액 79,200원"` 같은 원문을 만나면 `grossAmount`에서 차감해 실수령액으로 변환한 뒤
+이 필드에 담는다.
 
 ⚠️ **`confirmedExpectedRate`가 null인데 `referenceRate`를 몰래 갖다 쓰면 안 된다.**
 사용자 확인 전에는 참조율을 적용하지 않는다(5-1).
+
+#### 화면 분기(C) — status만으로는 4상태를 가르지 못한다
+
+`NetAmountStatus`는 3값인데 화면 상태는 4개다. 2순위와 3순위가 둘 다 `calculated`라
+**참조율 안내 문구는 `payerStatedNetAmount`를 함께 봐야** 갈린다.
+
+| 화면 상태 | 판별식 | 표시 |
+| --- | --- | --- |
+| 추정 불가 | `status === "unavailable"` | `추정 불가` 배지(4-3) |
+| 참조율 승인 | `status === "calculated" && payerStatedNetAmount === null` | 잠정 실수령액 + `※ 확인 전 추정치이며 N% 참조율을 적용했습니다`(5-3) |
+| 지급처 안내 | `status === "calculated" && payerStatedNetAmount !== null` | 금액만. **참조율 안내 문구를 붙이지 않는다** |
+| 입금 확인 후 | `status === "actual"` | 실제 실수령액 + `actualRate` 역산값 |
 
 ---
 
