@@ -99,6 +99,12 @@ export default function NewContractPage() {
     setSettlementDay(candidate.settlementDay != null ? String(candidate.settlementDay) : "");
     setManualExpectedDate(manualDate ?? "");
     setIncomeType(candidate.incomeTypeCandidate);
+    // [#19] 지급처가 안내한 금액이 있으면 그대로 넘긴다. 참조율보다 우선한다.
+    setPayerStated(
+      candidate.payerStatedNetAmountCandidate != null
+        ? String(candidate.payerStatedNetAmountCandidate)
+        : "",
+    );
     // 참조율 확인은 승계하지 않는다. 소득유형이 바뀌었을 수 있다.
     setRateConfirmed(false);
     setErrors([]);

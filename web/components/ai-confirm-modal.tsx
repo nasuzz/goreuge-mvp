@@ -21,6 +21,8 @@ import type { IncomeType, SettlementTerm } from "@/shared/enums";
 const FIELD_LABEL: Record<CandidateField, string> = {
   clientName: "거래처",
   grossAmount: "계약 총액",
+  // [#19] 지급처가 원문에서 직접 안내한 실수령액. 공제율로 만들어낸 값이 아니다.
+  payerStatedNetAmountCandidate: "지급처 안내 실수령액",
   completionDate: "완료일",
   settlementTerm: "정산조건",
   incomeTypeCandidate: "소득유형",
@@ -161,6 +163,26 @@ export function AIConfirmModal({
               placeholder="2400000"
               className={`${inputClass} tnum`}
             />
+          </FieldRow>
+
+          <FieldRow review={findField(fields, "payerStatedNetAmountCandidate")}>
+            <input
+              aria-label={FIELD_LABEL.payerStatedNetAmountCandidate}
+              inputMode="numeric"
+              value={candidate.payerStatedNetAmountCandidate ?? ""}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/[^0-9]/g, "");
+                update(
+                  { payerStatedNetAmountCandidate: digits ? Number(digits) : null },
+                  "payerStatedNetAmountCandidate",
+                );
+              }}
+              placeholder="안내받은 금액이 있을 때만"
+              className={`${inputClass} tnum`}
+            />
+            <span className="text-xs text-muted">
+              지급처가 알려준 금액입니다. 있으면 참조율 계산보다 우선합니다.
+            </span>
           </FieldRow>
 
           <FieldRow review={findField(fields, "completionDate")}>
