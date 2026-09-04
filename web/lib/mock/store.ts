@@ -19,6 +19,7 @@ import {
   revertManualStatus,
   runAllScenarios,
 } from "@/engine/index";
+import { normalizeClientName } from "@/lib/client-name";
 import { MOCK_ENGINE_INPUT, TODAY } from "@/shared/mock-data";
 import type {
   CashflowSummary,
@@ -131,12 +132,14 @@ export function completeOnboarding(values: OnboardingInput) {
 export function addContract(values: ContractCreateInput): Contract {
   const { input } = snapshot;
 
-  // 거래처는 이름으로 find-or-create 한다. API 라우트(#21)와 같은 규칙.
-  const normalized = values.clientName.trim();
-  const existing = input.clients.find((c) => c.name === normalized);
+  // 거래처는 이름으로 find-or-create 한다. 비교는 정규화한 값으로,
+  // 저장은 사용자가 입력한 원문 그대로 — API 라우트(#21)와 같은 규칙이다.
+  const displayName = values.clientName.trim();
+  const normalized = normalizeClientName(displayName);
+  const existing = input.clients.find((c) => normalizeClientName(c.name) === normalized);
   const client: Client = existing ?? {
     id: "client-local-" + Date.now(),
-    name: normalized,
+    name: displayName,
     completedCount: 0,
     medianDelayDays: null,
     p90DelayDays: null,

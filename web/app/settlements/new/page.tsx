@@ -8,7 +8,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { TERM_LABEL } from "@/lib/contract-view";
 import { dateLabel, won } from "@/lib/format";
 import { useMockStore } from "@/lib/mock/store";
-import { getWithholdingReference } from "@/shared/policy";
+import { FIXED_COPY, getWithholdingReference } from "@/shared/policy";
 import type { IncomeType, SettlementTerm } from "@/shared/enums";
 
 const TERMS: SettlementTerm[] = [
@@ -30,6 +30,11 @@ const INCOME_TYPES: { value: IncomeType; label: string }[] = [
 
 const NEEDS_DAY: SettlementTerm[] = ["NEXT_MONTH_DAY", "NET_DAYS"];
 
+// 검증 규칙은 #21 API 라우트(parseContractInput)와 같은 값을 쓴다.
+// Mock에서 통과한 입력이 실제 API에서 400을 맞으면 안 된다.
+const MIN_SETTLEMENT_DAY = 1;
+const MAX_SETTLEMENT_DAY = 365;
+
 export default function NewContractPage() {
   const router = useRouter();
   const { addContract, today } = useMockStore();
@@ -42,22 +47,36 @@ export default function NewContractPage() {
   const [settlementDay, setSettlementDay] = useState("");
   const [manualExpectedDate, setManualExpectedDate] = useState("");
   const [incomeType, setIncomeType] = useState<IncomeType>("business_personal_service");
-  const [rateConfirmed, setRateConfirmed] = useState(true);
+  // 참조율은 사용자가 명시적으로 확인해야 적용된다(5-1 requiresUserConfirmation).
+  // 기본 체크로 두면 확인 없이 3.3%가 적용돼 바로 아래 안내 문구와 어긋난다.
+  const [rateConfirmed, setRateConfirmed] = useState(false);
   const [payerStated, setPayerStated] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
 
   const reference = getWithholdingReference(incomeType);
 
+  const settlementDayValue = settlementDay === "" ? null : Number(settlementDay);
+  const settlementDayInRange =
+    settlementDayValue !== null &&
+    Number.isInteger(settlementDayValue) &&
+    settlementDayValue >= MIN_SETTLEMENT_DAY &&
+    settlementDayValue <= MAX_SETTLEMENT_DAY;
+  const settlementDayReady = !NEEDS_DAY.includes(settlementTerm) || settlementDayInRange;
+
   // 예정입금일은 입력하는 동안 계속 다시 계산해서 보여준다(기획서 5-3).
   const calculatedDate = useMemo(() => {
     if (!completionDate) return null;
+    // [PR #25 리뷰 P0] settlementDay가 비었거나 범위 밖이면 엔진이 예외를 던진다.
+    // 렌더 중에 던지면 사용자가 일수를 채우기도 전에 페이지 전체가 error boundary로
+    // 넘어가므로, 값이 준비되기 전에는 엔진을 호출하지 않고 null로 둔다.
+    if (!settlementDayReady) return null;
     return calculateExpectedDate({
       settlementTerm,
-      settlementDay: settlementDay ? Number(settlementDay) : null,
+      settlementDay: settlementDayValue,
       completionDate,
       invoiceDate: invoiceDate || null,
     });
-  }, [settlementTerm, settlementDay, completionDate, invoiceDate]);
+  }, [settlementTerm, settlementDayValue, settlementDayReady, completionDate, invoiceDate]);
 
   const expectedDate = manualExpectedDate || calculatedDate;
 
@@ -77,12 +96,23 @@ export default function NewContractPage() {
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
+    // 검증 순서와 조건은 #21 API의 parseContractInput과 맞춘다.
     const found: string[] = [];
+    const gross = Number(grossAmount);
+    const payer = payerStated === "" ? null : Number(payerStated);
+
     if (!clientName.trim()) found.push("거래처 이름을 입력해 주세요.");
-    if (!grossAmount || Number(grossAmount) <= 0) found.push("계약 총액을 입력해 주세요.");
+    if (!grossAmount || !Number.isInteger(gross) || gross <= 0) {
+      found.push("계약 총액은 1원 이상의 정수여야 합니다.");
+    }
     if (!completionDate) found.push("완료일을 입력해 주세요.");
-    if (NEEDS_DAY.includes(settlementTerm) && !settlementDay) {
-      found.push(`${TERM_LABEL[settlementTerm]} 조건은 일자 또는 일수가 필요합니다.`);
+    if (NEEDS_DAY.includes(settlementTerm) && !settlementDayInRange) {
+      found.push(
+        `${TERM_LABEL[settlementTerm]} 조건은 ${MIN_SETTLEMENT_DAY}~${MAX_SETTLEMENT_DAY} 사이의 정수가 필요합니다.`,
+      );
+    }
+    if (payer !== null && (!Number.isInteger(payer) || payer < 0 || payer > gross)) {
+      found.push("지급처 안내 실수령액은 0원 이상, 계약 총액 이하의 정수여야 합니다.");
     }
     if (!expectedDate) {
       found.push("예정입금일을 계산할 수 없습니다. 직접 입력해 주세요.");
@@ -97,7 +127,7 @@ export default function NewContractPage() {
       completionDate,
       invoiceDate: invoiceDate || null,
       settlementTerm,
-      settlementDay: settlementDay ? Number(settlementDay) : null,
+      settlementDay: settlementDayValue,
       manualExpectedDate: manualExpectedDate || null,
       incomeType,
       // AI 후보를 그대로 저장하지 않는다. 이 화면은 사용자가 확인한 값만 넘긴다.
@@ -199,11 +229,18 @@ export default function NewContractPage() {
                 {expectedDate ? dateLabel(expectedDate) : "계산 불가"}
               </span>
             </div>
-            {!calculatedDate && (
-              <p className="mt-1 text-xs text-muted">
-                이 조건으로는 예정입금일을 계산할 수 없습니다. 아래에서 직접 입력해 주세요.
-              </p>
-            )}
+            {!calculatedDate &&
+              (NEEDS_DAY.includes(settlementTerm) && !settlementDayInRange ? (
+                <p className="mt-1 text-xs text-caution">
+                  {settlementDay === ""
+                    ? `${TERM_LABEL[settlementTerm]} 조건은 일자 또는 일수를 입력해야 계산할 수 있습니다.`
+                    : `${MIN_SETTLEMENT_DAY}~${MAX_SETTLEMENT_DAY} 사이의 정수를 입력해 주세요.`}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-muted">
+                  이 조건으로는 예정입금일을 계산할 수 없습니다. 아래에서 직접 입력해 주세요.
+                </p>
+              ))}
           </div>
 
           <Field
@@ -226,7 +263,11 @@ export default function NewContractPage() {
             <select
               id="incomeType"
               value={incomeType}
-              onChange={(e) => setIncomeType(e.target.value as IncomeType)}
+              onChange={(e) => {
+                setIncomeType(e.target.value as IncomeType);
+                // 이전 소득유형에서 확인한 참조율이 새 참조율로 승계되면 안 된다.
+                setRateConfirmed(false);
+              }}
               className={inputClass}
             >
               {INCOME_TYPES.map((option) => (
@@ -290,10 +331,18 @@ export default function NewContractPage() {
                 {netPreview.amount === null ? "추정 불가" : won(netPreview.amount)}
               </span>
             </div>
-            {netPreview.status === "calculated" && !payerStated && (
+            {netPreview.status === "calculated" && !payerStated && confirmedExpectedRate !== null && (
+              // 0.033 * 100은 3.3000000000000003이 된다. 문구도 policy.ts 원문을 쓴다.
               <p className="mt-1 text-xs text-muted">
-                ※ 확인 전 추정치이며 {(confirmedExpectedRate ?? 0) * 100}% 참조율을 적용했습니다.
+                ※{" "}
+                {FIXED_COPY.referenceRateApplied.replace(
+                  "{rate}",
+                  (confirmedExpectedRate * 100).toFixed(1).replace(/\.0$/, ""),
+                )}
               </p>
+            )}
+            {netPreview.status === "unavailable" && (
+              <p className="mt-1 text-xs text-muted">{FIXED_COPY.netAmountUnavailable}</p>
             )}
           </div>
         </Card>

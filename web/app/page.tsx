@@ -4,7 +4,7 @@ import Link from "next/link";
 import { addDays } from "@/engine/index";
 import { Badge, Card, EmptyState, Row, toneOfLevel } from "@/components/ui";
 import { WhatIfPanel } from "@/components/what-if-panel";
-import { ddayLabel, dateLabel, longDateLabel, won } from "@/lib/format";
+import { ddayLabel, dateLabel, longDateLabel, signedDays, won } from "@/lib/format";
 import { useMockStore } from "@/lib/mock/store";
 import type { CashflowResult } from "@/shared/types";
 
@@ -12,10 +12,13 @@ export default function HomePage() {
   const { summary, input, today, onboarded } = useMockStore();
   const { baseline, optimistic, pessimistic, weekly, balanceBreakdown, riskCause } = summary;
 
-  // D-day 당일의 잔액 등급으로 상단 색을 정한다. D-day가 없으면 안전.
-  const level = baseline.dDay
-    ? (baseline.projections.find((p) => p.date === baseline.dDay)?.level ?? "danger")
-    : "safe";
+  // 오늘의 예상잔액 등급. 캘린더 배경색과 같은 기준(엔진의 level)을 쓴다.
+  //
+  // 처음에는 D-day 당일의 등급을 썼는데, D-day는 정의상 잔액이 0 이하가 되는 날이라
+  // D-day가 있으면 무조건 "위험"이 나왔다. 세 시나리오 배지가 전부 위험으로 찍혀서
+  // 낙관과 비관을 구분하지 못했다.
+  const todayLevel =
+    baseline.projections.find((p) => p.date === today)?.level ?? "safe";
 
   const weekEnd = addDays(today, 7);
   const thisWeekInflows = baseline.inflows.filter(
@@ -43,16 +46,16 @@ export default function HomePage() {
       </header>
 
       {/* 기준 D-day — 홈에서 가장 크게 보여준다(기획서 2장) */}
-      <section
-        className={`rounded-2xl border border-line p-6 ${
-          level === "danger"
-            ? "bg-danger-bg"
-            : level === "caution"
-              ? "bg-caution-bg"
-              : "bg-safe-bg"
-        }`}
-      >
-        <p className="text-sm font-medium opacity-80">기준 시나리오로 버틸 수 있는 기간</p>
+      <section className="rounded-2xl border border-line bg-surface p-6">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-muted">기준 시나리오 D-day</p>
+          <span className="shrink-0">
+            <Badge tone={toneOfLevel(todayLevel)}>
+              오늘 잔액{" "}
+              {todayLevel === "safe" ? "안전" : todayLevel === "caution" ? "주의" : "위험"}
+            </Badge>
+          </span>
+        </div>
         <p className="mt-1 flex items-baseline gap-2">
           <span className="tnum text-5xl font-bold tracking-tight">
             {ddayLabel(baseline.daysRemaining)}
@@ -61,7 +64,7 @@ export default function HomePage() {
             <span className="text-sm opacity-80">남았어요 · {dateLabel(baseline.dDay)}</span>
           )}
         </p>
-        <p className="mt-3 text-sm opacity-80">
+        <p className="mt-3 text-sm text-muted">
           시작 잔액 {won(baseline.simulationStartBalance)}에서 예상 입금과 지출을 하루씩 적용한
           결과입니다.
         </p>
@@ -69,9 +72,9 @@ export default function HomePage() {
 
       <Card title="세 가지 시나리오" aside="입금 지연 가정만 다릅니다">
         <ul className="grid grid-cols-3 gap-2">
-          <ScenarioCell label="낙관" result={optimistic} />
-          <ScenarioCell label="기준" result={baseline} highlight />
-          <ScenarioCell label="비관" result={pessimistic} />
+          <ScenarioCell label="낙관" result={optimistic} baseline={baseline} />
+          <ScenarioCell label="기준" result={baseline} baseline={baseline} highlight />
+          <ScenarioCell label="비관" result={pessimistic} baseline={baseline} />
         </ul>
         <p className="mt-3 text-xs text-muted">
           정시율을 금액에 곱하지 않고 시나리오별로 입금일만 이동시킵니다. 금액은 세 시나리오
@@ -195,15 +198,20 @@ export default function HomePage() {
 function ScenarioCell({
   label,
   result,
+  baseline,
   highlight = false,
 }: {
   label: string;
   result: CashflowResult;
+  baseline: CashflowResult;
   highlight?: boolean;
 }) {
-  const level = result.dDay
-    ? (result.projections.find((p) => p.date === result.dDay)?.level ?? "danger")
-    : "safe";
+  // 잔액 등급 배지 대신 기준 시나리오와의 차이를 보여준다.
+  // 세 시나리오의 차이는 "며칠 더/덜 버티는가"이고, 그게 비교의 목적이다.
+  const gap =
+    result.daysRemaining !== null && baseline.daysRemaining !== null
+      ? result.daysRemaining - baseline.daysRemaining
+      : null;
 
   return (
     <li
@@ -214,11 +222,17 @@ function ScenarioCell({
       <p className="text-xs text-muted">{label}</p>
       <p className="tnum mt-1 text-lg font-bold">{ddayLabel(result.daysRemaining)}</p>
       <p className="mt-1 text-xs text-muted">{dateLabel(result.dDay)}</p>
-      <div className="mt-2 flex justify-center">
-        <Badge tone={toneOfLevel(level)}>
-          {level === "safe" ? "안전" : level === "caution" ? "주의" : "위험"}
-        </Badge>
-      </div>
+      <p
+        className={`tnum mt-1.5 text-xs ${
+          gap === null || gap === 0
+            ? "text-muted"
+            : gap > 0
+              ? "text-safe"
+              : "text-danger"
+        }`}
+      >
+        {highlight ? "기준" : gap === null ? "비교 불가" : signedDays(gap)}
+      </p>
     </li>
   );
 }
