@@ -1,8 +1,20 @@
 // engine/index.ts — C가 import하는 진입점
 export { runScenario, runAllScenarios, computeSimulationStartBalance } from "./simulate";
-export { calculateScenarioDate, addDays } from "./scenarioDate";
+export { calculateScenarioDate, addDays, diffDays } from "./scenarioDate";
 export { buildOutflowSchedule } from "./outflowSchedule";
 export { getBalanceLevel } from "../shared/policy";
+
+// [이슈 #3 추가]
+export {
+  recalculateContractStatus,
+  recalculateContractStatuses,
+  markContractAsRisk,
+  cancelContract,
+  revertManualStatus,
+} from "./statusTransition";
+export { compareWhatIf, formatWhatIfMessage, splitDelayedMonthlyOutflow } from "./whatIf";
+// WhatIfAssumption/WhatIfResult는 shared/types.ts가 원본이다 (whatIf.ts는 재정의하지 않음).
+export type { WhatIfAssumption, WhatIfResult } from "../shared/types";
 
 // [이슈 #14 추가]
 export { calculateExpectedDate } from "./expectedDate";
