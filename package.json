@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.build.json",
     "smoke": "npm run build && node dist/test/smoke.js",
     "engine-verify": "npm run build && node dist/test/engine-verify.js",
-    "verify": "npm run typecheck && npm run build && node dist/test/smoke.js && node dist/test/engine-verify.js"
+    "test:ai": "npm run build && node dist/test/ai-evaluation.js",
+    "verify": "npm run typecheck && npm run build && node dist/test/smoke.js && node dist/test/engine-verify.js && node dist/test/ai-evaluation.js"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

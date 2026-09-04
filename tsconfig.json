@@ -12,6 +12,7 @@
   },
   "include": [
     "src/shared/**/*.ts",
-    "src/engine/**/*.ts"
+    "src/engine/**/*.ts",
+    "src/ai/**/*.ts"
   ]
 }
