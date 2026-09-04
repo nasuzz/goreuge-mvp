@@ -10,6 +10,9 @@ import { dateLabel, won } from "@/lib/format";
 import { useMockStore } from "@/lib/mock/store";
 import { FIXED_COPY, getWithholdingReference } from "@/shared/policy";
 import type { IncomeType, SettlementTerm } from "@/shared/enums";
+import type { AIContractCandidate } from "@/shared/types";
+import type { AIConfirmationViewModel } from "@/ai/confirmation-flow";
+import { AIConfirmModal } from "@/components/ai-confirm-modal";
 
 const TERMS: SettlementTerm[] = [
   "ON_COMPLETION",
@@ -52,6 +55,56 @@ export default function NewContractPage() {
   const [rateConfirmed, setRateConfirmed] = useState(false);
   const [payerStated, setPayerStated] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
+
+  // AI 초안 (#7)
+  const [aiText, setAiText] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [candidateModel, setCandidateModel] = useState<AIConfirmationViewModel | null>(null);
+  const [applied, setApplied] = useState(false);
+
+  async function requestCandidate() {
+    setAiLoading(true);
+    setAiError(null);
+    setApplied(false);
+    try {
+      const response = await fetch("/api/ai/contract-candidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: aiText, referenceDate: today }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        // 서버가 사용자에게 보여줄 문구를 이미 정해서 준다. 그대로 쓴다.
+        setAiError(typeof data?.error === "string" ? data.error : "후보를 만들지 못했습니다.");
+        return;
+      }
+      setCandidateModel(data as AIConfirmationViewModel);
+    } catch {
+      setAiError("분석 요청을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  /** 확인 모달에서 사용자가 확인·수정한 값만 폼에 채운다. 저장은 하지 않는다. */
+  function applyCandidate(
+    candidate: AIContractCandidate,
+    manualDate: string | null,
+  ) {
+    setClientName(candidate.clientName ?? "");
+    setGrossAmount(candidate.grossAmount != null ? String(candidate.grossAmount) : "");
+    setCompletionDate(candidate.completionDate ?? today);
+    setSettlementTerm(candidate.settlementTerm ?? "UNKNOWN");
+    setSettlementDay(candidate.settlementDay != null ? String(candidate.settlementDay) : "");
+    setManualExpectedDate(manualDate ?? "");
+    setIncomeType(candidate.incomeTypeCandidate);
+    // 참조율 확인은 승계하지 않는다. 소득유형이 바뀌었을 수 있다.
+    setRateConfirmed(false);
+    setErrors([]);
+    setCandidateModel(null);
+    setApplied(true);
+  }
 
   const reference = getWithholdingReference(incomeType);
 
@@ -145,6 +198,40 @@ export default function NewContractPage() {
         title="계약 등록"
         description="입력한 값으로 예정입금일과 예상 실수령액을 계산합니다."
       />
+
+      {/* 카톡·메일 원문 → AI 후보 → 사용자 확인 → 폼 채우기 (#7) */}
+      <Card title="카톡·메일 붙여넣기" aside="AI 초안">
+        <p className="mb-2 text-sm text-muted">
+          받은 메시지를 그대로 붙여넣으면 계약 항목 후보를 뽑아드립니다. AI는 값을 확정하지
+          않고, 확인 화면을 거친 값만 아래 폼에 채웁니다.
+        </p>
+        <textarea
+          aria-label="카톡 또는 메일 내용"
+          value={aiText}
+          onChange={(e) => setAiText(e.target.value)}
+          rows={4}
+          placeholder="예: 편집본은 9월 3일 납품이고 총 240만원입니다. 정산은 익월 말일에 드릴게요."
+          className={`${inputClass} resize-y`}
+        />
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={requestCandidate}
+            disabled={aiLoading || !aiText.trim()}
+            className="rounded-xl bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-40"
+          >
+            {aiLoading ? "분석 중…" : "AI로 초안 만들기"}
+          </button>
+          {applied && (
+            <span className="text-xs text-safe">확인한 값을 아래 폼에 채웠습니다.</span>
+          )}
+        </div>
+        {aiError && (
+          <p role="alert" className="mt-2 rounded-xl bg-danger-bg px-3 py-2.5 text-sm text-danger">
+            {aiError}
+          </p>
+        )}
+      </Card>
 
       <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
         <Card title="계약 정보">
@@ -371,12 +458,13 @@ export default function NewContractPage() {
         </div>
       </form>
 
-      <Card title="카톡·메일 붙여넣기" aside="#7에서 연결">
-        <p className="text-sm text-muted">
-          AI 계약 초안 추출과 확인 모달은 별도 이슈(#7)에서 B의 파서에 연결합니다. 연결 후에도
-          AI가 값을 확정하지 않고, 이 화면과 같은 확인 단계를 거쳐 저장합니다.
-        </p>
-      </Card>
+      {candidateModel && (
+        <AIConfirmModal
+          initial={candidateModel}
+          onClose={() => setCandidateModel(null)}
+          onApply={applyCandidate}
+        />
+      )}
     </main>
   );
 }
