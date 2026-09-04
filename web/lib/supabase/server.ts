@@ -1,3 +1,7 @@
+// Server boundary enforced in code: importing this from a Client Component
+// fails at build time. Next.js handles this import internally, so the npm
+// package does not need to be installed.
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 // Server-only access (shared-spec D5-a). Never use the NEXT_PUBLIC_ prefix.
