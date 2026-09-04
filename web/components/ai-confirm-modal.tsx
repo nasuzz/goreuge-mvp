@@ -171,10 +171,7 @@ export function AIConfirmModal({
               value={candidate.payerStatedNetAmountCandidate ?? ""}
               onChange={(e) => {
                 const digits = e.target.value.replace(/[^0-9]/g, "");
-                update(
-                  { payerStatedNetAmountCandidate: digits ? Number(digits) : null },
-                  "payerStatedNetAmountCandidate",
-                );
+                update({ payerStatedNetAmountCandidate: digits ? Number(digits) : null });
               }}
               placeholder="안내받은 금액이 있을 때만"
               className={`${inputClass} tnum`}
