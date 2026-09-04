@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { rebuildAIConfirmationViewModel } from "@/ai/confirmation-flow";
+import { recomputeMissingFields } from "@/ai/review-rules";
 import type { AIConfirmationViewModel } from "@/ai/confirmation-flow";
 import type { CandidateField } from "@/ai/review-rules";
 import { Badge } from "@/components/ui";
@@ -70,21 +71,19 @@ export function AIConfirmModal({
 
   function update(
     patch: Partial<AIContractCandidate>,
-    filled?: CandidateField,
     nextReviewed = reviewed,
     nextManual = manualExpectedDate,
   ) {
+    const merged: AIContractCandidate = { ...model.candidate, ...patch };
+    const manual = nextManual || null;
+    // 누락 여부는 매번 현재 값으로 다시 판정한다. 채운 필드를 깎기만 하면
+    // 값을 도로 지웠을 때 배지가 돌아오지 않고, "확인 필요"를 고른 것도
+    // 채운 것으로 처리돼 배지와 차단 사유가 어긋난다.
     const candidate: AIContractCandidate = {
-      ...model.candidate,
-      ...patch,
-      // 사용자가 채운 필드는 더 이상 누락이 아니다.
-      missingFields: filled
-        ? model.candidate.missingFields.filter((f) => f !== filled)
-        : model.candidate.missingFields,
+      ...merged,
+      missingFields: recomputeMissingFields(merged, manual),
     };
-    setModel(
-      rebuildAIConfirmationViewModel(model, candidate, nextReviewed, nextManual || null),
-    );
+    setModel(rebuildAIConfirmationViewModel(model, candidate, nextReviewed, manual));
   }
 
   const { candidate, fields, gate } = model;
@@ -143,7 +142,7 @@ export function AIConfirmModal({
             <input
               aria-label={FIELD_LABEL.clientName}
               value={candidate.clientName ?? ""}
-              onChange={(e) => update({ clientName: e.target.value || null }, "clientName")}
+              onChange={(e) => update({ clientName: e.target.value || null })}
               placeholder="거래처 이름"
               className={inputClass}
             />
@@ -156,7 +155,7 @@ export function AIConfirmModal({
               value={candidate.grossAmount ?? ""}
               onChange={(e) => {
                 const digits = e.target.value.replace(/[^0-9]/g, "");
-                update({ grossAmount: digits ? Number(digits) : null }, "grossAmount");
+                update({ grossAmount: digits ? Number(digits) : null });
               }}
               placeholder="2400000"
               className={`${inputClass} tnum`}
@@ -169,7 +168,7 @@ export function AIConfirmModal({
               type="date"
               value={candidate.completionDate ?? ""}
               onChange={(e) =>
-                update({ completionDate: e.target.value || null }, "completionDate")
+                update({ completionDate: e.target.value || null })
               }
               className={inputClass}
             />
@@ -180,7 +179,7 @@ export function AIConfirmModal({
               aria-label={FIELD_LABEL.settlementTerm}
               value={candidate.settlementTerm ?? "UNKNOWN"}
               onChange={(e) =>
-                update({ settlementTerm: e.target.value as SettlementTerm }, "settlementTerm")
+                update({ settlementTerm: e.target.value as SettlementTerm })
               }
               className={inputClass}
             >
@@ -217,7 +216,7 @@ export function AIConfirmModal({
                 value={manualExpectedDate}
                 onChange={(e) => {
                   setManualExpectedDate(e.target.value);
-                  update({}, undefined, reviewed, e.target.value);
+                  update({}, reviewed, e.target.value);
                 }}
                 className={inputClass}
               />
@@ -232,10 +231,7 @@ export function AIConfirmModal({
               aria-label={FIELD_LABEL.incomeTypeCandidate}
               value={candidate.incomeTypeCandidate}
               onChange={(e) =>
-                update(
-                  { incomeTypeCandidate: e.target.value as IncomeType },
-                  "incomeTypeCandidate",
-                )
+                update({ incomeTypeCandidate: e.target.value as IncomeType })
               }
               className={inputClass}
             >
@@ -254,7 +250,7 @@ export function AIConfirmModal({
             checked={reviewed}
             onChange={(e) => {
               setReviewed(e.target.checked);
-              update({}, undefined, e.target.checked);
+              update({}, e.target.checked);
             }}
             className="mt-0.5 size-4 accent-[var(--accent)]"
           />
