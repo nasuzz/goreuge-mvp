@@ -17,6 +17,7 @@ const CANDIDATE_JSON_SCHEMA = {
   properties: {
     clientName: { type: ["string", "null"] },
     grossAmount: { type: ["integer", "null"], minimum: 0 },
+    payerStatedNetAmountCandidate: { type: ["integer", "null"], minimum: 0 },
     completionDate: { type: ["string", "null"], pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
     settlementTerm: {
       type: ["string", "null"],
@@ -33,17 +34,18 @@ const CANDIDATE_JSON_SCHEMA = {
       properties: {
         clientName: { type: "number", minimum: 0, maximum: 1 },
         grossAmount: { type: "number", minimum: 0, maximum: 1 },
+        payerStatedNetAmountCandidate: { type: "number", minimum: 0, maximum: 1 },
         completionDate: { type: "number", minimum: 0, maximum: 1 },
         settlementTerm: { type: "number", minimum: 0, maximum: 1 },
         incomeTypeCandidate: { type: "number", minimum: 0, maximum: 1 },
       },
-      required: ["clientName", "grossAmount", "completionDate", "settlementTerm", "incomeTypeCandidate"],
+      required: ["clientName", "grossAmount", "payerStatedNetAmountCandidate", "completionDate", "settlementTerm", "incomeTypeCandidate"],
     },
     missingFields: { type: "array", items: { type: "string" } },
     needsReview: { type: "boolean" },
   },
   required: [
-    "clientName", "grossAmount", "completionDate", "settlementTerm", "settlementDay",
+    "clientName", "grossAmount", "payerStatedNetAmountCandidate", "completionDate", "settlementTerm", "settlementDay",
     "incomeTypeCandidate", "confidence", "missingFields", "needsReview",
   ],
 } as const;
