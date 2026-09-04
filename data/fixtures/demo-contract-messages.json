@@ -1,0 +1,6 @@
+{
+  "synthetic": true,
+  "notice": "아래 문장은 실제 메시지가 아닌 금융 AI Challenge 시연용 합성 데이터입니다.",
+  "referenceDate": "2026-09-01",
+  "demoCaseIds": ["eval-01", "eval-03", "eval-05", "eval-08", "eval-10"]
+}
