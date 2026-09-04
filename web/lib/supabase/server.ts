@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 // Server-only access (shared-spec D5-a). Never use the NEXT_PUBLIC_ prefix.
