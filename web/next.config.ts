@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname, ".."),
   },
+  // `next dev` detects an AI coding agent and writes AGENTS.md / CLAUDE.md into
+  // this directory by default (next/dist/server/lib/generate-agent-files.js).
+  // We keep those files out of the repo: a checked-in file telling any agent
+  // that opens the repo to go read something is a prompt-injection shape we do
+  // not want in version control, even though the generator itself is genuine.
+  // The version-matched docs stay readable at node_modules/next/dist/docs/.
+  agentRules: false,
 };
 
 export default nextConfig;
