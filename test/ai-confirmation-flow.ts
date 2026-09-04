@@ -25,7 +25,15 @@ if (initial.fallbackNotice?.includes("provider") || initial.fallbackNotice?.incl
 if (initial.gate.canSave || !initial.gate.errors.includes("AI 후보를 확인해 주세요.")) {
   failures.push("최초 AI 후보는 사용자 확인 전 저장이 차단되어야 합니다.");
 }
-if (initial.fields.length !== 5 || initial.fields.some((field) => field.missing)) {
+// 개수를 상수로 박으면 후보 필드가 늘 때마다 깨진다.
+// 실제로 #19에서 payerStatedNetAmountCandidate가 추가되자 5 -> 6이 되면서 이 검사가
+// 실패했다. 검증하려는 건 "confidence를 가진 필드가 빠짐없이 검토 대상에 오른다"이므로
+// candidate.confidence의 키 수를 기준으로 삼는다.
+const expectedFieldCount = Object.keys(initial.candidate.confidence).length;
+if (
+  initial.fields.length !== expectedFieldCount ||
+  initial.fields.some((field) => field.missing)
+) {
   failures.push("정상 문장의 필드별 검토 상태가 올바르지 않습니다.");
 }
 

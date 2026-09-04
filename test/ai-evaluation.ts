@@ -9,7 +9,7 @@ import { getCandidateFieldReviews, getConfidenceTone, getConfirmationGate } from
 
 type Expected = Pick<
   AIContractCandidate,
-  "clientName" | "grossAmount" | "completionDate" | "settlementTerm" |
+  "clientName" | "grossAmount" | "payerStatedNetAmountCandidate" | "completionDate" | "settlementTerm" |
   "settlementDay" | "incomeTypeCandidate" | "needsReview"
 >;
 
@@ -28,7 +28,7 @@ interface EvaluationDataset {
 const path = resolve(process.cwd(), "data/ground-truth/contract-evaluation.json");
 const dataset = JSON.parse(readFileSync(path, "utf8")) as EvaluationDataset;
 const fields: (keyof Expected)[] = [
-  "clientName", "grossAmount", "completionDate", "settlementTerm",
+  "clientName", "grossAmount", "payerStatedNetAmountCandidate", "completionDate", "settlementTerm",
   "settlementDay", "incomeTypeCandidate", "needsReview",
 ];
 
@@ -77,6 +77,12 @@ async function main() {
   if (!masked.maskedText.includes("[거래처]") || !masked.maskedText.includes("[계좌번호]") || !masked.maskedText.includes("2026년 9월 3일")) {
     failures.push("마스킹 placeholder 또는 계약 날짜 보존 결과가 올바르지 않습니다.");
   }
+  const payerSensitiveText = "[D에이전시] 총액 2,400,000원, 실수령액 2,320,800원을 지급합니다. 우리은행 1002-123-456789";
+  const payerMasked = maskContractText(payerSensitiveText);
+  const payerAfterMask = parseContractDeterministically(payerMasked.maskedText, { referenceDate: dataset.referenceDate }).candidate;
+  if (payerAfterMask.payerStatedNetAmountCandidate !== 2320800) {
+    failures.push("개인정보 마스킹 이후 지급처 안내 실수령액 후보가 보존되지 않았습니다.");
+  }
 
   let providerRequestBody = "";
   const maskedAIOutput = {
@@ -103,12 +109,24 @@ async function main() {
   if (!providerRequestBody.includes("[거래처]") || !providerRequestBody.includes("[계좌번호]")) {
     failures.push("OpenAI API 요청 본문에 마스킹 placeholder가 없습니다.");
   }
+  if (!providerRequestBody.includes("payerStatedNetAmountCandidate")) {
+    failures.push("OpenAI Structured Outputs 스키마에 지급처 안내 실수령액 후보가 없습니다.");
+  }
+
+  const legacyCandidate = { ...mockAIOutput } as Partial<AIContractCandidate> & Record<string, unknown>;
+  delete legacyCandidate.payerStatedNetAmountCandidate;
+  const legacyConfidence = { ...mockAIOutput.confidence } as Partial<AIContractCandidate["confidence"]>;
+  delete legacyConfidence.payerStatedNetAmountCandidate;
+  legacyCandidate.confidence = legacyConfidence as AIContractCandidate["confidence"];
+  if (validateCandidate(legacyCandidate as AIContractCandidate).length === 0) {
+    failures.push("구형 AI 출력에서 신규 지급처 안내 후보 필드 누락을 감지하지 못했습니다.");
+  }
 
   if (getConfidenceTone(0.8) !== "normal" || getConfidenceTone(0.5) !== "warning" || getConfidenceTone(0.49) !== "danger") {
     failures.push("confidence 3단계 경계값이 공용 정책과 일치하지 않습니다.");
   }
   const fieldReviews = getCandidateFieldReviews(mockAIOutput);
-  if (fieldReviews.length !== 5 || fieldReviews.some((field) => field.missing)) {
+  if (fieldReviews.length !== 6 || fieldReviews.some((field) => field.missing)) {
     failures.push("확인 모달용 필드 상태 계산이 올바르지 않습니다.");
   }
   if (getConfirmationGate(mockAIOutput, false).canSave) {
@@ -120,6 +138,13 @@ async function main() {
   const missingAmount = { ...mockAIOutput, grossAmount: null };
   if (getConfirmationGate(missingAmount, true).canSave) {
     failures.push("필수 금액 누락 시 저장이 차단되어야 합니다.");
+  }
+  const rateOnly = parseContractDeterministically(
+    "[비율테스트] 2026년 9월 3일 완료, 총액 2,400,000원, 익월 말일 3.3% 공제",
+    { referenceDate: dataset.referenceDate },
+  ).candidate;
+  if (rateOnly.payerStatedNetAmountCandidate !== null) {
+    failures.push("공제율만 있는 원문에서 지급처 안내 실수령액을 임의 생성했습니다.");
   }
 
   const accuracy = total === 0 ? 0 : correct / total;
