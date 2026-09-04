@@ -4,6 +4,7 @@ import type { AIContractCandidate } from "../src/shared/types";
 import { parseContractDeterministically, validateCandidate } from "../src/ai/contract-parser";
 import { parseContractWithFallback } from "../src/ai/parser-service";
 import { OpenAIContractProvider } from "../src/ai/openai-provider";
+import { maskContractText } from "../src/ai/privacy-mask";
 import { getCandidateFieldReviews, getConfidenceTone, getConfirmationGate } from "../src/ai/review-rules";
 
 type Expected = Pick<
@@ -68,15 +69,39 @@ async function main() {
   }
 
   const mockAIOutput = parseContractDeterministically(dataset.cases[0].text, { referenceDate: dataset.referenceDate }).candidate;
+  const sensitiveText = "[D에이전시] 납품은 2026년 9월 3일이고 총 240만원입니다. 우리은행 1002-123-456789로 지급합니다. 익월 말일, 3.3% 공제예요.";
+  const masked = maskContractText(sensitiveText);
+  if (masked.clientName !== "D에이전시" || masked.maskedText.includes("D에이전시") || masked.maskedText.includes("1002-123-456789")) {
+    failures.push("거래처명·계좌번호 마스킹 결과가 올바르지 않습니다.");
+  }
+  if (!masked.maskedText.includes("[거래처]") || !masked.maskedText.includes("[계좌번호]") || !masked.maskedText.includes("2026년 9월 3일")) {
+    failures.push("마스킹 placeholder 또는 계약 날짜 보존 결과가 올바르지 않습니다.");
+  }
+
+  let providerRequestBody = "";
+  const maskedAIOutput = {
+    ...mockAIOutput,
+    clientName: "[거래처]",
+    confidence: { ...mockAIOutput.confidence, clientName: 0.5 },
+  };
   const provider = new OpenAIContractProvider({
     apiKey: "test-key",
-    fetchImpl: async () => new Response(JSON.stringify({
-      output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(mockAIOutput) }] }],
-    }), { status: 200, headers: { "Content-Type": "application/json" } }),
+    fetchImpl: async (_url, init) => {
+      providerRequestBody = String(init?.body ?? "");
+      return new Response(JSON.stringify({
+        output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(maskedAIOutput) }] }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    },
   });
-  const aiResult = await parseContractWithFallback(dataset.cases[0].text, dataset.referenceDate, provider);
+  const aiResult = await parseContractWithFallback(sensitiveText, dataset.referenceDate, provider);
   if (aiResult.source !== "ai" || aiResult.candidate.clientName !== "D에이전시") {
-    failures.push("OpenAI provider의 구조화 출력 연결이 동작하지 않았습니다.");
+    failures.push("OpenAI provider의 구조화 출력 연결 또는 로컬 거래처명 복원이 동작하지 않았습니다.");
+  }
+  if (providerRequestBody.includes("D에이전시") || providerRequestBody.includes("1002-123-456789")) {
+    failures.push("OpenAI API 요청 본문에 마스킹 전 개인정보가 포함됐습니다.");
+  }
+  if (!providerRequestBody.includes("[거래처]") || !providerRequestBody.includes("[계좌번호]")) {
+    failures.push("OpenAI API 요청 본문에 마스킹 placeholder가 없습니다.");
   }
 
   if (getConfidenceTone(0.8) !== "normal" || getConfidenceTone(0.5) !== "warning" || getConfidenceTone(0.49) !== "danger") {
@@ -98,9 +123,9 @@ async function main() {
   }
 
   const accuracy = total === 0 ? 0 : correct / total;
-  console.log("고르게 합성 데이터 기준 AI 파싱 평가");
+  console.log("고르게 합성 데이터 기준 fallback 파서 평가");
   console.log(`- 평가 문장: ${dataset.cases.length}건`);
-  console.log(`- 필드 일치: ${correct}/${total} (${(accuracy * 100).toFixed(1)}%)`);
+  console.log(`- fallback 파서 필드 일치: ${correct}/${total} (${(accuracy * 100).toFixed(1)}%)`);
   console.log(`- 스키마 오류: ${invalidOutputs}건`);
   console.log(`- fallback: ${fallbackResult.source}`);
   console.log(`- OpenAI provider mock: ${aiResult.source}`);
@@ -112,7 +137,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("✅ 합성 데이터 평가 전부 통과");
+  console.log("✅ 합성 데이터 기준 fallback 파서 평가 전부 통과");
 }
 
 void main();

@@ -5,6 +5,7 @@
 - `contract-parser.ts`: API 장애 시에도 동작하는 수기 확인용 로컬 파서
 - `parser-service.ts`: 실제 AI provider를 주입하고 출력 검증 후 자동 fallback
 - `openai-provider.ts`: 서버 전용 OpenAI Responses API Structured Outputs provider
+- `privacy-mask.ts`: 외부 AI 전송 전 거래처명·계좌번호 마스킹 및 로컬 복원
 - `review-rules.ts`: C 확인 모달의 confidence 단계와 저장 가능 여부 계산
 - `prompt.ts`: 실제 모델에 전달할 시스템 규칙
 - `data/ground-truth/contract-evaluation.json`: 합성 평가 문장 20건과 정답
@@ -37,6 +38,7 @@ const result = await parseContractWithFallback(text, referenceDate, provider);
 ```
 
 `OPENAI_API_KEY`는 서버 환경변수로만 설정하며 `NEXT_PUBLIC_` 접두사를 붙이지 않습니다. 기본 모델은 `gpt-5.4-mini`이고 `OPENAI_MODEL`로 교체할 수 있습니다.
+거래처명과 계좌번호는 provider가 전송 전에 placeholder로 치환하며, 거래처명 후보는 모델 응답 후 로컬 추출값으로 복원합니다.
 
 ## UI 규칙
 
@@ -69,4 +71,4 @@ const gate = getConfirmationGate(candidate, userReviewed, manualExpectedDate);
 npm run test:ai
 ```
 
-평가 결과에는 반드시 “합성 데이터 기준”이라고 표시합니다. 이 평가는 실제 사용자 메시지에 대한 일반 성능을 의미하지 않습니다.
+평가 결과에는 반드시 “합성 데이터 기준 fallback 파서 평가”라고 표시합니다. 140/140은 규칙 기반 fallback 파서의 필드 일치 결과이며, 실제 OpenAI 모델 정확도나 실제 사용자 메시지에 대한 일반 성능을 의미하지 않습니다.

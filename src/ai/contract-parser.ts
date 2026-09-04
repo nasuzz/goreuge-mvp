@@ -137,6 +137,11 @@ function extractClientName(text: string): { value: string | null; confidence: nu
   return { value: null, confidence: 0 };
 }
 
+/** 외부 AI 전송 전 마스킹에 사용할 로컬 거래처명 후보. 원문 밖의 이름은 만들지 않는다. */
+export function extractClientNameCandidate(text: string): string | null {
+  return extractClientName(text.replace(/\s+/g, " ").trim()).value;
+}
+
 export function parseContractDeterministically(text: string, options: ParseContractOptions): ParseContractResult {
   const normalized = text.replace(/\s+/g, " ").trim();
   const warnings: string[] = [];

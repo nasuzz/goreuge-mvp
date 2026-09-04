@@ -1,6 +1,7 @@
 import type { AIContractCandidate, DateString } from "../shared/types";
 import type { AIContractProvider } from "./parser-service";
 import { CONTRACT_PARSER_SYSTEM_PROMPT } from "./prompt";
+import { maskContractText } from "./privacy-mask";
 
 type FetchLike = typeof fetch;
 
@@ -78,6 +79,7 @@ export class OpenAIContractProvider implements AIContractProvider {
   }
 
   async parse(text: string, referenceDate: DateString): Promise<AIContractCandidate> {
+    const { maskedText, clientName } = maskContractText(text);
     const response = await this.fetchImpl("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
@@ -88,7 +90,7 @@ export class OpenAIContractProvider implements AIContractProvider {
         model: this.model,
         store: false,
         instructions: CONTRACT_PARSER_SYSTEM_PROMPT,
-        input: `기준일: ${referenceDate}\n계약 메시지:\n${text}`,
+        input: `기준일: ${referenceDate}\n계약 메시지:\n${maskedText}`,
         text: {
           format: {
             type: "json_schema",
@@ -104,7 +106,15 @@ export class OpenAIContractProvider implements AIContractProvider {
     if (!response.ok) throw new Error(payload.error?.message ?? `OpenAI API 오류 (${response.status})`);
     const outputText = getOutputText(payload);
     if (!outputText) throw new Error("OpenAI 응답에 output_text가 없습니다.");
-    return JSON.parse(outputText) as AIContractCandidate;
+    const candidate = JSON.parse(outputText) as AIContractCandidate;
+
+    // 모델에는 placeholder만 보낸다. 거래처명은 원문에서 로컬로 추출한 후보를 복원한다.
+    if (clientName) {
+      candidate.clientName = clientName;
+      candidate.confidence.clientName = 0.96;
+      candidate.missingFields = candidate.missingFields.filter((field) => field !== "clientName");
+    }
+    return candidate;
   }
 }
 
