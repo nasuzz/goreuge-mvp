@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.pnpm-local/
+.pnpm-store/
 package-lock.json
 *.log
 .DS_Store
