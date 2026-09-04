@@ -17,7 +17,7 @@
 --   alter table contracts add constraint chk_net_le_gross check (
 --     (expected_net_amount is null or expected_net_amount <= gross_amount)
 --     and (actual_net_amount is null or actual_net_amount <= gross_amount)
---     and (payer_stated_net_amount is null or payer_stated_net_amount <= gross_amount)
+--     and (payer_stated_net_amount is null or payer_stated_net_amount between 0 and gross_amount)
 --   );
 --
 create type contract_status as enum
@@ -134,7 +134,7 @@ create table contracts (
   constraint chk_net_le_gross check (
     (expected_net_amount is null or expected_net_amount <= gross_amount)
     and (actual_net_amount is null or actual_net_amount <= gross_amount)
-    and (payer_stated_net_amount is null or payer_stated_net_amount <= gross_amount)
+    and (payer_stated_net_amount is null or payer_stated_net_amount between 0 and gross_amount)
   )
 );
 create index idx_contracts_user     on contracts(user_id);
