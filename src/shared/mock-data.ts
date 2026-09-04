@@ -139,7 +139,13 @@ function validateIntegrity(): void {
     ) {
       throw new Error(`[규칙 위반] ${c.id}: ${c.settlementTerm}에는 settlementDay가 필요합니다`);
     }
-    for (const f of ["expectedNetAmount", "actualNetAmount"] as const) {
+    // [이슈 #16] payerStatedNetAmount는 반드시 명시적으로 null이어야 한다.
+    // undefined(필드 자체 누락)면 "!== null" 체크가 true로 평가돼서 계산 함수가
+    // 잘못된 값을 지급처 안내 금액으로 오인한다 — 실제로 발생을 확인한 버그.
+    if (c.payerStatedNetAmount === undefined) {
+      throw new Error(`[규칙 위반] ${c.id}: payerStatedNetAmount 필드가 없습니다 (null이어야 함, undefined 금지)`);
+    }
+    for (const f of ["expectedNetAmount", "actualNetAmount", "payerStatedNetAmount"] as const) {
       const v = c[f];
       if (v !== null && v > c.grossAmount) {
         throw new Error(`[규칙 위반] ${c.id}: ${f}가 grossAmount를 초과합니다`);

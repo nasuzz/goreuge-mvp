@@ -42,6 +42,12 @@ import { MOCK, MOCK_ENGINE_INPUT, EXPECTED, TODAY } from "@/shared/mock-data";
 
 - **날짜** `"YYYY-MM-DD"` KST 달력일 문자열. `Date` 객체를 함수 경계에서 주고받지 않는다.
   (타임존 때문에 D-day가 하루씩 어긋나는 게 가장 흔한 사고다.)
+- **오늘(today) vs 지금(now) [PR #13 리뷰 반영, 2026-09-03 추가]**
+  `today: DateString`("YYYY-MM-DD")은 날짜 연산(경과일수 판정 등) 전용이다.
+  `statusUpdatedAt`/`updatedAt`처럼 규약상 `DateTimeString`(ISO 8601)인 필드에
+  `today`를 그대로 넣지 않는다 — 둘 다 타입 별칭이 `string`이라 컴파일러가 안 잡아준다.
+  실제 시각을 찍어야 하는 함수는 `now: DateTimeString`을 **별도 인자로** 받는다.
+  (엔진은 `Date.now()`를 절대 호출하지 않으므로 `now`도 `today`처럼 호출부가 주입한다.)
 - **금액** 원 단위 정수. 함수가 소수를 반환하지 않는다.
 - **오늘** 엔진은 `Date.now()`를 **절대 부르지 않는다.** `today`를 인자로 받는다.
 - **반올림** [확정 D8] — `policy.ts`의 `round` 헬퍼만 사용
@@ -153,19 +159,44 @@ function calculateExpectedNetAmount(
 ### 3-4. 계약 상태 자동 전이
 
 ```ts
-function recalculateContractStatus(contract: Contract, today: DateString): Contract;
+function recalculateContractStatus(
+  contract: Contract, today: DateString, now: DateTimeString,
+): Contract;
+
+function recalculateContractStatuses(
+  contracts: Contract[], today: DateString, now: DateTimeString,
+): Contract[];
 ```
 
 | 현재 | 조건 | 전이 |
 | --- | --- | --- |
 | waiting | 예정일 경과 & 미입금 | → `delayed` (system) |
-| delayed | 60일 이상 미입금 | → `risk` (system) |
+| waiting 또는 delayed | 60일 이상 미입금 | → `risk` (system, **즉시 전이** — delayed를 거치지 않는다) |
 | any | 사용자 수동 지정 | → `risk` (user, **statusReason 필수**) |
 | any | 입금 확인 | → `completed` |
 | any | 계약 취소 | → `cancelled` |
 
 **`statusSource === "user"`인 계약은 자동 전이가 덮어쓰지 않는다.**
 사용자가 직접 위험으로 지정한 걸 시스템이 되돌리면 안 된다.
+
+**[PR #13 리뷰 반영] 60일 이상 경과는 waiting이든 delayed든 즉시 risk로 간다.**
+`recalculateContractStatus`를 화면이 한 번만 호출하는 경우를 대비해, waiting → delayed → risk를
+호출 두 번에 걸쳐 순차 전이시키지 않는다 — `overdueDays >= 60`이면 delayed를 거치지 않고 바로 risk.
+
+**사용자 수동 액션은 별도 함수다.** `recalculateContractStatus`는 자동 전이만 담당하고,
+사용자가 직접 누르는 액션(위험 지정/취소/수동 상태 되돌리기)은 아래 세 함수가 처리한다.
+셋 다 날짜 연산이 필요 없어 `today` 없이 `now`만 받는다.
+
+```ts
+function markContractAsRisk(contract: Contract, reason: string, now: DateTimeString): Contract;
+function cancelContract(contract: Contract, reason: string, now: DateTimeString): Contract;
+function revertManualStatus(
+  contract: Contract, nextStatus: "waiting" | "delayed", now: DateTimeString,
+): Contract;
+```
+
+`markContractAsRisk`/`cancelContract`는 `reason`이 빈 문자열이면 throw한다
+(DB 제약 `chk_user_status_reason`과 1:1 대응).
 
 ---
 
@@ -269,12 +300,16 @@ danger  : balance < referenceAmount × 0.3
 ### 3-8. 대응안 가정 비교 (P0, 최대 3개)
 
 ```ts
-function compareWhatIf(input: EngineInput, assumptions: WhatIfAssumption[]): WhatIfResult[];
+function compareWhatIf(
+  input: EngineInput, assumptions: WhatIfAssumption[], now: DateTimeString,
+): WhatIfResult[];
 ```
 
 - 원본 데이터를 **변경하지 않는다.** 입력을 복사해 가정만 반영하고 다시 돌린다.
 - 버튼명은 `적용`이 아니라 `가정해 보기` / `시뮬레이션에 반영`(6-1).
 - 문구 예시: `선금 500,000원이 9월 15일에 입금된다고 가정하면 D-day가 13일 늘어나요.`
+- `now`는 `advance_payment` 가정으로 내부에 만드는 가상 계약의 `createdAt`/`updatedAt`/
+  `statusUpdatedAt`(DateTimeString)에 쓰인다. [PR #13 리뷰 반영]
 
 ---
 
@@ -392,16 +427,26 @@ function applySavingsCheck(
 
 ---
 
-## 5. C가 알아야 할 함수는 6개뿐
+## 5. C가 알아야 할 함수 [PR #13 리뷰 반영으로 시그니처 갱신, 2026-09-03]
 
 ```
-runAllScenarios(input)          → 홈 전부 (D-day, 3시나리오, 가용금액, 위험원인)
-compareWhatIf(input, [...])     → 대응안 비교 카드
-calculateExpectedDate(...)      → 계약 등록 화면 미리보기
-calculateExpectedNetAmount(c)   → 예상 실수령액 표시
-recalculateContractStatus(c)    → 정산함 상태 배지
-getBalanceLevel(...)            → 캘린더 3단계 배경색
+runAllScenarios(input)                          → 홈 전부 (D-day, 3시나리오, 가용금액, 위험원인)
+compareWhatIf(input, [...], now)                → 대응안 비교 카드
+calculateExpectedDate(...)                      → 계약 등록 화면 미리보기
+calculateExpectedNetAmount(c)                   → 예상 실수령액 표시
+recalculateContractStatus(c, today, now)        → 정산함 상태 배지 (자동 전이만)
+getBalanceLevel(...)                            → 캘린더 3단계 배경색
 ```
+
+**+ 사용자가 직접 누르는 액션 3개 (자동 전이와 별도, `today` 없이 `now`만 받음)**
+```
+markContractAsRisk(c, reason, now)    → "위험으로 지정" 버튼
+cancelContract(c, reason, now)        → "계약 취소" 버튼
+revertManualStatus(c, next, now)      → 수동 지정 되돌리기
+```
+
+`now: DateTimeString`(ISO 8601)은 `today: DateString`("YYYY-MM-DD")와 별개다 — 2절 참고.
+서버에서 요청 처리 시각으로 `now`를 만들고, 그 날짜 부분만 잘라 `today`로 같이 넘기면 된다.
 
 일별 루프·지연 정책·무결성 검증은 전부 A 내부 사정이다.
 

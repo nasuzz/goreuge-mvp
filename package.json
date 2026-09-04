@@ -4,8 +4,14 @@
   "type": "commonjs",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "smoke": "tsc -p tsconfig.build.json && node dist/test/smoke.js",
-    "verify": "npm run typecheck && npm run smoke"
+    "build": "tsc -p tsconfig.build.json",
+    "smoke": "npm run build && node dist/test/smoke.js",
+    "engine-verify": "npm run build && node dist/test/engine-verify.js",
+    "whatif-verify": "npm run build && node dist/test/whatif-verify.js",
+    "expected-verify": "npm run build && node dist/test/expected-verify.js",
+    "issue16-verify": "npm run build && node dist/test/issue16-verify.js",
+    "test:ai": "npm run build && node dist/test/ai-evaluation.js",
+    "verify": "npm run typecheck && npm run build && node dist/test/smoke.js && node dist/test/engine-verify.js && node dist/test/whatif-verify.js && node dist/test/expected-verify.js && node dist/test/issue16-verify.js && node dist/test/ai-evaluation.js"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

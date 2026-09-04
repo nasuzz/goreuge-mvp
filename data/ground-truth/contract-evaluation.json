@@ -1,0 +1,148 @@
+{
+  "datasetName": "고르게 합성 계약 파싱 평가셋",
+  "synthetic": true,
+  "referenceDate": "2026-09-01",
+  "notice": "실제 카카오톡·메일·금융정보가 아닌 대표 페르소나 기반 합성 데이터입니다.",
+  "cases": [
+    {
+      "id": "eval-01",
+      "channel": "kakao",
+      "text": "[D에이전시] 납품은 2026년 9월 3일이고 총 240만원입니다. 정산은 익월 말일, 사업소득 3.3% 공제예요.",
+      "tags": ["basic", "next_month_end", "business_income"],
+      "expected": { "clientName": "D에이전시", "grossAmount": 2400000, "completionDate": "2026-09-03", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": false }
+    },
+    {
+      "id": "eval-02",
+      "channel": "email",
+      "text": "[스튜디오봄] 완료일은 2026년 9월 10일, 계약 금액은 2,400,000원입니다. 완료 후 30일 지급하고 원천징수 없이 입금합니다.",
+      "tags": ["comma_amount", "net_days", "no_withholding"],
+      "expected": { "clientName": "스튜디오봄", "grossAmount": 2400000, "completionDate": "2026-09-10", "settlementTerm": "NET_DAYS", "settlementDay": 30, "incomeTypeCandidate": "no_withholding", "needsReview": false }
+    },
+    {
+      "id": "eval-03",
+      "channel": "kakao",
+      "text": "[브릭컴퍼니] 2026년 9월 12일 납품, 총액 240만원 VAT 별도입니다. 익월 말일 지급, 3.3% 처리합니다.",
+      "tags": ["vat_excluded", "review"],
+      "expected": { "clientName": "브릭컴퍼니", "grossAmount": 2640000, "completionDate": "2026-09-12", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
+    },
+    {
+      "id": "eval-04",
+      "channel": "email",
+      "text": "[라이트하우스] 납품일은 2026년 9월 8일입니다. 총 이백사십만원, 다음 달 말일 정산이며 사업소득으로 처리합니다.",
+      "tags": ["korean_amount"],
+      "expected": { "clientName": "라이트하우스", "grossAmount": 2400000, "completionDate": "2026-09-08", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": false }
+    },
+    {
+      "id": "eval-05",
+      "channel": "kakao",
+      "text": "[모노픽처스] 2026년 9월 14일 납품이고 익월 말일에 3.3% 공제 후 지급할게요.",
+      "tags": ["missing_amount"],
+      "expected": { "clientName": "모노픽처스", "grossAmount": null, "completionDate": "2026-09-14", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
+    },
+    {
+      "id": "eval-06",
+      "channel": "email",
+      "text": "[플랜비] 계약 금액 1,800,000원, 정산은 익월 15일이고 공제 없이 지급합니다. 완료일은 추후 전달하겠습니다.",
+      "tags": ["missing_completion_date", "next_month_day"],
+      "expected": { "clientName": "플랜비", "grossAmount": 1800000, "completionDate": null, "settlementTerm": "NEXT_MONTH_DAY", "settlementDay": 15, "incomeTypeCandidate": "no_withholding", "needsReview": true }
+    },
+    {
+      "id": "eval-07",
+      "channel": "kakao",
+      "text": "[온더레코드] 2026년 9월 20일 완료, 총액 150만원입니다. 검수 후 지급하고 기타소득 8.8% 처리 예정입니다.",
+      "tags": ["unknown_settlement", "other_income"],
+      "expected": { "clientName": "온더레코드", "grossAmount": 1500000, "completionDate": "2026-09-20", "settlementTerm": "UNKNOWN", "settlementDay": null, "incomeTypeCandidate": "qualifying_other_income", "needsReview": true }
+    },
+    {
+      "id": "eval-08",
+      "channel": "email",
+      "text": "[픽셀웨이브] 2026년 9월 18일 납품, 처음 안내한 240만원이 아니라 총 260만원으로 정정합니다. 익월 말일, 3.3% 공제입니다.",
+      "tags": ["conflicting_amount", "correction"],
+      "expected": { "clientName": "픽셀웨이브", "grossAmount": 2600000, "completionDate": "2026-09-18", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
+    },
+    {
+      "id": "eval-09",
+      "channel": "kakao",
+      "text": "[오렌지랩] 총액 300만원 중 선금 90만원, 잔금 210만원입니다. 2026년 9월 25일 완료 후 잔금 지급, 3.3% 공제예요.",
+      "tags": ["split_payment", "unsupported"],
+      "expected": { "clientName": "오렌지랩", "grossAmount": 3000000, "completionDate": "2026-09-25", "settlementTerm": "UNKNOWN", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
+    },
+    {
+      "id": "eval-10",
+      "channel": "email",
+      "text": "[코발트] 2026년 9월 5일 납품한 110만원 건, 기존 9월 30일에서 10월 10일로 지급일 변경합니다. 공제 없습니다.",
+      "tags": ["payment_date_changed", "manual_date"],
+      "expected": { "clientName": "코발트", "grossAmount": 1100000, "completionDate": "2026-09-05", "settlementTerm": "UNKNOWN", "settlementDay": null, "incomeTypeCandidate": "no_withholding", "needsReview": true }
+    },
+    {
+      "id": "eval-11",
+      "channel": "kakao",
+      "text": "[웹메이츠] 마감은 2026년 9월 11일, 금액 980,000원이고 다음 달 10일 지급입니다. 사업소득 처리합니다.",
+      "tags": ["next_month_day"],
+      "expected": { "clientName": "웹메이츠", "grossAmount": 980000, "completionDate": "2026-09-11", "settlementTerm": "NEXT_MONTH_DAY", "settlementDay": 10, "incomeTypeCandidate": "business_personal_service", "needsReview": false }
+    },
+    {
+      "id": "eval-12",
+      "channel": "email",
+      "text": "[아틀리에문] 완료일 2026년 9월 16일, 총 75만원입니다. 이번 달 말일 정산이며 공제 없이 지급합니다.",
+      "tags": ["same_month_end"],
+      "expected": { "clientName": "아틀리에문", "grossAmount": 750000, "completionDate": "2026-09-16", "settlementTerm": "SAME_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "no_withholding", "needsReview": false }
+    },
+    {
+      "id": "eval-13",
+      "channel": "kakao",
+      "text": "[번역공방] 2026년 9월 7일 완료 즉시 620,000원을 지급합니다. 기타소득 8.8% 예정입니다.",
+      "tags": ["on_completion"],
+      "expected": { "clientName": "번역공방", "grossAmount": 620000, "completionDate": "2026-09-07", "settlementTerm": "ON_COMPLETION", "settlementDay": null, "incomeTypeCandidate": "qualifying_other_income", "needsReview": false }
+    },
+    {
+      "id": "eval-14",
+      "channel": "email",
+      "text": "[NovaLab] 납품 예정일은 2026년 10월 2일이며 계약 금액은 3,200,000원입니다. 청구 후 45일, 원천징수 없이 지급합니다.",
+      "tags": ["net_45", "english_client"],
+      "expected": { "clientName": "NovaLab", "grossAmount": 3200000, "completionDate": "2026-10-02", "settlementTerm": "NET_DAYS", "settlementDay": 45, "incomeTypeCandidate": "no_withholding", "needsReview": false }
+    },
+    {
+      "id": "eval-15",
+      "channel": "kakao",
+      "text": "9월 22일 납품, 총액 130만원이고 익월 말일 3.3% 공제 후 지급 예정입니다.",
+      "tags": ["missing_client", "year_omitted"],
+      "expected": { "clientName": null, "grossAmount": 1300000, "completionDate": "2026-09-22", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
+    },
+    {
+      "id": "eval-16",
+      "channel": "email",
+      "text": "[교육센터온] 강의 완료일은 2026년 9월 28일, 급여 900,000원은 익월 25일 지급합니다.",
+      "tags": ["employment_income"],
+      "expected": { "clientName": "교육센터온", "grossAmount": 900000, "completionDate": "2026-09-28", "settlementTerm": "NEXT_MONTH_DAY", "settlementDay": 25, "incomeTypeCandidate": "employment_income", "needsReview": false }
+    },
+    {
+      "id": "eval-17",
+      "channel": "kakao",
+      "text": "[콘텐츠하우스] 원고 완료는 2026년 9월 6일, 원고료 500,000원은 익월 말일 지급하고 기타소득으로 처리합니다.",
+      "tags": ["other_income_without_rate"],
+      "expected": { "clientName": "콘텐츠하우스", "grossAmount": 500000, "completionDate": "2026-09-06", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "qualifying_other_income", "needsReview": false }
+    },
+    {
+      "id": "eval-18",
+      "channel": "email",
+      "text": "[프리즘디자인] 2026년 9월 30일 납품, 4,000,000원입니다. 납품 후 60일 지급하며 소득유형 안내는 없습니다.",
+      "tags": ["income_type_missing", "net_60"],
+      "expected": { "clientName": "프리즘디자인", "grossAmount": 4000000, "completionDate": "2026-09-30", "settlementTerm": "NET_DAYS", "settlementDay": 60, "incomeTypeCandidate": "needs_review", "needsReview": true }
+    },
+    {
+      "id": "eval-19",
+      "channel": "kakao",
+      "text": "[오후스튜디오] 2026년 2월 30일 완료, 총 1,200,000원이고 익월 말일 공제 없이 지급합니다.",
+      "tags": ["invalid_date"],
+      "expected": { "clientName": "오후스튜디오", "grossAmount": 1200000, "completionDate": null, "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "no_withholding", "needsReview": true }
+    },
+    {
+      "id": "eval-20",
+      "channel": "email",
+      "text": "[루프앤코] 완료일: 2026.09.27 / 계약 금액: 2,750,000원 / 익월 20일 / 인적용역 사업소득입니다.",
+      "tags": ["dot_date", "structured_text"],
+      "expected": { "clientName": "루프앤코", "grossAmount": 2750000, "completionDate": "2026-09-27", "settlementTerm": "NEXT_MONTH_DAY", "settlementDay": 20, "incomeTypeCandidate": "business_personal_service", "needsReview": false }
+    }
+  ]
+}
