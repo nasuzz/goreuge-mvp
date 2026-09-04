@@ -1,4 +1,5 @@
 {
   "//": "Turbopack reads the nearest package.json for the module format. The repo root declares type=commonjs for the node dist/ test scripts, but src/**/*.ts is written in ESM, so web/ fails to import @/shared/* and @/engine/* without this override. Affects source resolution only - tsconfig.build.json still emits CommonJS into dist/.",
+  "private": true,
   "type": "module"
 }
