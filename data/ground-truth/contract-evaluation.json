@@ -21,8 +21,8 @@
     {
       "id": "eval-03",
       "channel": "kakao",
-      "text": "[브릭컴퍼니] 2026년 9월 12일 납품, 총액 240만원 VAT 별도입니다. 익월 말일 지급, 3.3% 처리합니다.",
-      "tags": ["vat_excluded", "review"],
+      "text": "브릭컴퍼니 측에서 2026년 9월 12일 납품, 총액 240만원 VAT 별도입니다. 익월 말일 지급, 3.3% 처리합니다.",
+      "tags": ["vat_excluded", "review", "unlabeled_client_side"],
       "expected": { "clientName": "브릭컴퍼니", "grossAmount": 2640000, "payerStatedNetAmountCandidate": null, "completionDate": "2026-09-12", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
     },
     {
@@ -35,15 +35,15 @@
     {
       "id": "eval-05",
       "channel": "kakao",
-      "text": "[모노픽처스] 2026년 9월 14일 납품이고 익월 말일에 3.3% 공제 후 지급할게요.",
-      "tags": ["missing_amount"],
+      "text": "모노픽처스에서 2026년 9월 14일 납품이고 익월 말일에 3.3% 공제 후 지급할게요.",
+      "tags": ["missing_amount", "unlabeled_client_from"],
       "expected": { "clientName": "모노픽처스", "grossAmount": null, "payerStatedNetAmountCandidate": null, "completionDate": "2026-09-14", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
     },
     {
       "id": "eval-06",
       "channel": "email",
-      "text": "[플랜비] 계약 금액 1,800,000원, 정산은 익월 15일이고 공제 없이 지급합니다. 완료일은 추후 전달하겠습니다.",
-      "tags": ["missing_completion_date", "next_month_day"],
+      "text": "플랜비 웹디자인 건 계약 금액 1,800,000원, 정산은 익월 15일이고 공제 없이 지급합니다. 완료일은 추후 전달하겠습니다.",
+      "tags": ["missing_completion_date", "next_month_day", "unlabeled_client_project"],
       "expected": { "clientName": "플랜비", "grossAmount": 1800000, "payerStatedNetAmountCandidate": null, "completionDate": null, "settlementTerm": "NEXT_MONTH_DAY", "settlementDay": 15, "incomeTypeCandidate": "no_withholding", "needsReview": true }
     },
     {
@@ -56,15 +56,15 @@
     {
       "id": "eval-08",
       "channel": "email",
-      "text": "[픽셀웨이브] 2026년 9월 18일 납품, 처음 안내한 240만원이 아니라 총 260만원으로 정정합니다. 익월 말일, 3.3% 공제입니다.",
-      "tags": ["conflicting_amount", "correction"],
+      "text": "픽셀웨이브 홍보영상 건 2026년 9월 18일 납품, 처음 안내한 240만원이 아니라 총 260만원으로 정정합니다. 익월 말일, 3.3% 공제입니다.",
+      "tags": ["conflicting_amount", "correction", "unlabeled_client_project"],
       "expected": { "clientName": "픽셀웨이브", "grossAmount": 2600000, "payerStatedNetAmountCandidate": null, "completionDate": "2026-09-18", "settlementTerm": "NEXT_MONTH_END", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
     },
     {
       "id": "eval-09",
       "channel": "kakao",
-      "text": "[오렌지랩] 총액 300만원 중 선금 90만원, 잔금 210만원입니다. 2026년 9월 25일 완료 후 잔금 지급, 3.3% 공제예요.",
-      "tags": ["split_payment", "unsupported"],
+      "text": "오렌지랩 측에서 총액 300만원 중 선금 90만원, 잔금 210만원입니다. 2026년 9월 25일 완료 후 잔금 지급, 3.3% 공제예요.",
+      "tags": ["split_payment", "unsupported", "unlabeled_client_side"],
       "expected": { "clientName": "오렌지랩", "grossAmount": 3000000, "payerStatedNetAmountCandidate": null, "completionDate": "2026-09-25", "settlementTerm": "UNKNOWN", "settlementDay": null, "incomeTypeCandidate": "business_personal_service", "needsReview": true }
     },
     {

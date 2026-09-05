@@ -216,13 +216,32 @@ function extractIncomeType(text: string): { value: IncomeType; confidence: numbe
 }
 
 function extractClientName(text: string): { value: string | null; confidence: number } {
-  const patterns = [
+  const explicitPatterns = [
     /(?:거래처|클라이언트|발신|From)\s*[:：]\s*([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._ -]{1,24})/i,
     /^\s*\[([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._ -]{1,24})\]/,
   ];
-  for (const pattern of patterns) {
+  for (const pattern of explicitPatterns) {
     const match = text.match(pattern);
     if (match) return { value: match[1].trim(), confidence: 0.96 };
+  }
+
+  // 대괄호·라벨이 없는 카톡은 첫머리의 계약 문맥이 명확할 때만 후보화한다.
+  // 낮은 신뢰도로 반환해 확인 모달에서 자동 확정하지 않도록 한다.
+  const unlabeledPatterns = [
+    /^([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._ -]{1,23}?)\s*측(?:에서|은|이|과|와)?(?:\s|[,.:])*/,
+    /^([가-힣A-Za-z0-9&._-]{2,24})에서(?:\s|[,.:])*/,
+    /^([가-힣A-Za-z0-9&._-]{2,24})\s+(?:[가-힣A-Za-z0-9&._-]+\s+){1,3}건(?:\s|[,.:])*/,
+  ];
+  const nonClientLeadingWords = new Set([
+    "계약", "작업", "프로젝트", "홍보영상", "영상편집", "웹디자인", "디자인",
+    "번역", "촬영", "강의", "원고", "납품", "완료", "마감", "정산",
+  ]);
+  for (const pattern of unlabeledPatterns) {
+    const match = text.match(pattern);
+    const candidate = match?.[1]?.trim() ?? "";
+    if (candidate && !nonClientLeadingWords.has(candidate)) {
+      return { value: candidate, confidence: 0.7 };
+    }
   }
   return { value: null, confidence: 0 };
 }
