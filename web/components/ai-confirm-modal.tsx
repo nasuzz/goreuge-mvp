@@ -200,13 +200,19 @@ export function AIConfirmModal({
               value={candidate.settlementTerm ?? "UNKNOWN"}
               onChange={(e) => {
                 const settlementTerm = e.target.value as SettlementTerm;
-                if (!NEEDS_MANUAL_DATE.includes(settlementTerm)) {
+                const keepManualDate = NEEDS_MANUAL_DATE.includes(settlementTerm);
+                const keepSettlementDay =
+                  settlementTerm === candidate.settlementTerm && NEEDS_DAY.includes(settlementTerm);
+                if (!keepManualDate) {
                   setManualExpectedDate("");
                 }
                 update(
-                  { settlementTerm },
+                  {
+                    settlementTerm,
+                    settlementDay: keepSettlementDay ? candidate.settlementDay : null,
+                  },
                   reviewed,
-                  NEEDS_MANUAL_DATE.includes(settlementTerm) ? manualExpectedDate : "",
+                  keepManualDate ? manualExpectedDate : "",
                 );
               }}
               className={inputClass}
