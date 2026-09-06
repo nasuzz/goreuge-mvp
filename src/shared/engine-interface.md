@@ -351,27 +351,86 @@ function compareWhatIf(
 
 ---
 
-### 3-9. 입금 확인 & 공제율 역산 (P1)
+### 3-8-1. 조합 가정 비교 [구현 완료, 이슈 #50 / PR #58]
 
 ```ts
-function confirmPayment(contract: Contract, input: PaymentConfirmInput): Contract;
+interface CombinedWhatIfResult {
+  assumptions: WhatIfAssumption[];
+  dDayBefore: DateString | null;
+  dDayAfter: DateString | null;
+  dayDelta: number;
+}
+
+function compareWhatIfCombined(
+  input: EngineInput, assumptions: WhatIfAssumption[], now: DateTimeString,
+): CombinedWhatIfResult;
 ```
+
+`compareWhatIf`는 가정마다 원본의 깨끗한 복사본에서 독립적으로 계산하기 때문에
+"여러 가정을 동시에 적용하면 며칠인가"를 낼 수 없다. D-day는 "잔액이 최초로
+0 이하가 되는 날"이라 두 조치의 `dayDelta`를 단순히 더할 수 없기 때문이다 —
+실측(이슈 #50):
+
+```
+선금 1,500,000원 단독 : 09-14 -> 10-08  (+24일)
+카드 결제 연기 단독    : 09-14 -> 09-20  (+6일)
+둘 다 적용            : 09-14 -> 10-08  (+24일, 30일이 아니다)
+```
+
+그래서 `compareWhatIfCombined`는 여러 가정을 **같은 복사본에 순차 적용**한
+뒤 한 번만 재시뮬레이션한다.
+
+반환 타입이 `WhatIfResult`가 아니라 별도 `CombinedWhatIfResult`인 이유:
+`WhatIfResult.assumption`은 단수라 조합을 담으면 "N개 중 하나"만 실려 사실과
+달라진다. 가정 목록(`assumptions: WhatIfAssumption[]`)을 그대로 싣는 편이
+정직하다(PR #58 리뷰에서 A가 동의함).
+
+최대 개수 제한(`MVP_POLICY.maxWhatIfAssumptions`)은 `compareWhatIf`와 동일하게
+적용된다.
+
+---
+
+### 3-9. 입금 확인 & 공제율 역산 (P1) [구현 완료, 이슈 #55]
+
+```ts
+function confirmPayment(contract: Contract, input: PaymentConfirmInput, now: DateTimeString): Contract;
+```
+
+> **[이슈 #55, 시그니처 정정]** 구현하면서 원래 시그니처(`now` 없음)로는
+> `statusUpdatedAt`/`updatedAt`을 채우려고 함수 내부에서 `Date.now()`를 불러야
+> 해서, 이 문서 1절과 `statusTransition.ts`의 "엔진은 Date.now()를 직접
+> 호출하지 않는다" 원칙과 충돌했다. 다른 모든 전이 함수(`markContractAsRisk`
+> 등)와 같은 관례로 `now`를 호출부 주입 인자로 추가했다.
 
 ```
 actualRate = (grossAmount - actualNetAmount) / grossAmount
 ```
 
+`actual_rate` 컬럼이 `numeric(5,4)`라(이슈 #16의 `confirmed_expected_rate`
+원단위 오차와 같은 문제) 소수 4자리로 반올림해서 반환한다.
+
 - `classificationStatus → "actual_confirmed"`, `status → "completed"`
-- `expectedNetAmount`는 남겨두되 화면은 실제값 우선 표시
-- `clients` 지연 통계 재계산 트리거
+- `expectedNetAmount`는 남겨두되 화면은 실제값 우선 표시 (기존 `calculateExpectedNetAmount`가
+  이미 `actualNetAmount` 최우선이라 별도 처리 불필요 — `test/payment-confirm-verify.ts`에서
+  통합 확인함)
+- `clients` 지연 통계 재계산은 이 함수의 책임이 아니다. `Client` 전체 이력이 필요한
+  별도 집계라 `recalculateClientStats`(3-10)로 분리돼 있다 — 호출부(API 라우트)가
+  `confirmPayment` 다음에 그쪽도 호출해야 한다.
+- `actualNetAmount`가 0 이상 `grossAmount` 이하의 정수가 아니면 throw (`chk_actual_pair`
+  범위 제약과 대응)
 
 ---
 
-### 3-10. 거래처 지연 통계 갱신
+### 3-10. 거래처 지연 통계 갱신 [구현 완료, 이슈 #55]
 
 ```ts
 function recalculateClientStats(client: Client, completedContracts: Contract[]): Client;
 ```
+
+`completedContracts`는 호출부가 이미 완료 상태로 필터링해 넘긴다는 전제다. `completedCount`는
+배열 길이 그대로 반영하고, `medianDelayDays`/`p90DelayDays`는 그중 `expectedDate`·`actualDate`가
+모두 있어 지연일을 계산할 수 있는 건이 `clientHistoryMinCount`(3) 미만이면 `completedCount`와
+무관하게 `null`이다. p90은 보간 없이 최근접 순위 방식(`ceil(n*0.9)`번째 값)을 쓴다.
 
 ```
 지연일 = actualDate - expectedDate (음수면 0으로 clamp)

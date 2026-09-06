@@ -17,7 +17,7 @@
 // 엔진은 Date.now()를 직접 호출하지 않는 순수함수 원칙(engine-interface.md)을 지키기 위해
 // now도 today처럼 호출부(API 계층)가 주입한다 — 엔진 내부에서 실제 시각을 만들지 않는다.
 
-import type { Contract, DateString, DateTimeString } from "../shared/types";
+import type { Contract, DateString, DateTimeString, PaymentConfirmInput } from "../shared/types";
 import type { ContractStatus, StatusSource } from "../shared/enums";
 import { MVP_POLICY } from "../shared/policy";
 import { diffDays } from "./scenarioDate";
@@ -114,6 +114,59 @@ export function revertManualStatus(
   now: DateTimeString,
 ): Contract {
   return transitionTo(contract, nextStatus, "system", null, now);
+}
+
+// ── 입금 확인 (사용자 액션) ────────────────────────────────
+
+/**
+ * 실제 입금을 확인한다(engine-interface.md 3-9, 이슈 #55).
+ *
+ * [이슈 #55 반영 — 시그니처에 now 추가] engine-interface.md 3-9가 선언한
+ * 원 시그니처는 `confirmPayment(contract, input)`로 now가 없다. 그대로 두면
+ * statusUpdatedAt/updatedAt(DateTimeString)을 채우려고 함수 내부에서
+ * Date.now()를 불러야 하는데, 이 파일 맨 위 원칙("엔진은 Date.now()를 직접
+ * 호출하지 않는다")과 다른 모든 전이 함수(markContractAsRisk 등)의 관례를
+ * 정면으로 어긴다. 그래서 다른 함수들과 똑같이 now를 호출부 주입으로 받도록
+ * 시그니처를 넓혔다 — engine-interface.md 쪽 문서도 같이 갱신이 필요하다.
+ *
+ * actualRate = (grossAmount - actualNetAmount) / grossAmount. DB의 actual_rate가
+ * numeric(5,4)라(이슈 #16에서 confirmedExpectedRate가 겪은 것과 같은 원단위
+ * 오차 문제) 소수 4자리로 반올림해서 왕복 오차를 없앤다.
+ *
+ * classificationStatus -> "actual_confirmed", status -> "completed"로 바꾼다.
+ * expectedNetAmount는 그대로 둔다 — calculateExpectedNetAmount가 이미
+ * actualNetAmount를 최우선으로 보므로 화면은 실제값을 그대로 쓴다.
+ *
+ * completed는 종료 상태라 statusSource="system"·statusReason=null로 남긴다
+ * (markContractAsRisk/cancelContract처럼 사용자가 사유를 남기는 수동 지정과
+ * 달리, 입금 확인은 사실을 기록하는 것이지 판단을 내리는 게 아니다).
+ *
+ * 거래처 지연 통계(medianDelayDays/p90DelayDays) 재계산은 이 함수의 책임이
+ * 아니다 — Client 전체 이력이 필요한 별도 집계라 recalculateClientStats로
+ * 분리돼 있다(engine-interface.md 3-10). 호출부가 이 함수 다음에 그쪽도
+ * 호출해야 한다.
+ */
+export function confirmPayment(contract: Contract, input: PaymentConfirmInput, now: DateTimeString): Contract {
+  if (!Number.isInteger(input.actualNetAmount) || input.actualNetAmount < 0 || input.actualNetAmount > contract.grossAmount) {
+    throw new Error(
+      `[engine] confirmPayment: actualNetAmount는 0 이상이고 grossAmount(${contract.grossAmount}) 이하인 원 단위 정수여야 합니다 (실제 ${input.actualNetAmount})`,
+    );
+  }
+
+  const actualRate = Math.round(((contract.grossAmount - input.actualNetAmount) / contract.grossAmount) * 10_000) / 10_000;
+
+  return {
+    ...contract,
+    actualDate: input.actualDate,
+    actualNetAmount: input.actualNetAmount,
+    actualRate,
+    classificationStatus: "actual_confirmed",
+    status: "completed",
+    statusSource: "system",
+    statusReason: null,
+    statusUpdatedAt: now,
+    updatedAt: now,
+  };
 }
 
 // ── 내부 헬퍼 ──────────────────────────────────────────────
