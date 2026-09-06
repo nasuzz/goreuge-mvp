@@ -286,12 +286,16 @@ function findDelayOutflow(
 
   if (evaluated.length === 0) return null;
 
-  // 선택 규칙: (1) 목표 일수를 넘기는 것 우선, (2) 연기 일수가 짧을수록 좋다
-  // — 거래처·카드사에 요구하는 폭이 작다, (3) 그래도 같으면 효과가 큰 쪽,
-  // (4) 마지막은 id로 고정해 결정성을 보장한다.
+  // 선택 규칙: (1) 연기 일수가 짧을수록 좋다 — 거래처·카드사에 요구하는 폭이
+  // 작다, (2) 그래도 같으면 효과가 큰 쪽, (3) 마지막은 id로 고정해 결정성을 보장한다.
+  //
+  // [PR #70, nasuzz-dev] 원래 여기 reachedTarget 우선 조건이 있었는데 죽은 코드였다.
+  // 유출 연기는 pickFromLadder에 targetDays로 MIN_MEANINGFUL_DAYS를 그대로 넘기고,
+  // 같은 함수가 delta < MIN_MEANINGFUL_DAYS를 건너뛰므로, 살아남은 후보는 전부
+  // delta >= targetDays라 reachedTarget이 항상 true다. 정렬에서 늘 0이 되는 항이었다.
+  // (선금만 ADVANCE_TARGET_DAYS로 하한보다 높은 목표를 쓰므로 거기서는 의미가 있다.)
   evaluated.sort((a, b) =>
-    Number(b.reachedTarget) - Number(a.reachedTarget)
-    || a.picked - b.picked
+    a.picked - b.picked
     || b.delta - a.delta
     || a.outflow.id.localeCompare(b.outflow.id));
 
