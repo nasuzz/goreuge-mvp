@@ -167,6 +167,23 @@ run_prod() {
     exit 1
   fi
 
+  # [이슈 #52] npx 폴백이 들어가면서 PATH 가드(command -v vercel)를 통과하는
+  # 경로가 생겼는데, 미로그인 상태에서는 그 다음 `vercel env ls production`
+  # 호출이 로그인 흐름으로 빠져 입력을 무한정 기다린다 — 실패 방식이 "즉시
+  # 명확한 오류"에서 "무한 대기"로 바뀐 회귀다. 인증 여부를 짧은 타임아웃으로
+  # 먼저 확인해 되돌린다. `timeout`이 없는 환경(예: coreutils 미설치 macOS)
+  # 에서는 이 사전 확인만 건너뛰고 기존 동작(호출이 실제로 걸릴 수 있음)으로
+  # 진행한다 — 있는 게 없는 것보다 안전하다는 원칙.
+  if command -v timeout >/dev/null 2>&1; then
+    if ! timeout 30 "${VERCEL[@]}" whoami >/dev/null 2>&1; then
+      echo "오류: Vercel에 로그인돼 있지 않거나 CLI가 응답하지 않습니다." >&2
+      echo "  ${VERCEL[*]} login 후 다시 실행하세요." >&2
+      exit 1
+    fi
+  else
+    echo "경고: timeout 명령이 없어 Vercel 로그인 여부 사전 확인을 건너뜁니다." >&2
+  fi
+
   # [PR #44 리뷰 반영, lyoonji — P0] `vercel` CLI는 현재 디렉터리를 그대로
   # 업로드한다. web/에서 실행하면 web/만 올라가는데, 이 앱은 tsconfig의
   # `@/shared/*`·`@/engine/*`·`@/ai/*` 경로 별칭으로 저장소 루트의 ../src를
