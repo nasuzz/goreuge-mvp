@@ -149,7 +149,16 @@ export function runScenario(input: EngineInput, scenario: Scenario): CashflowRes
 
     const inflow = inflowByDate[date] ?? 0;
     const fixedOutflow = outflowByDate[date] ?? 0;
-    const newSavingsOutflow = 0; // P1 대상. P0에서는 항상 0 (plannedAmount 반영은 P1).
+    // [설계 결정 — 확인 필요, 이슈 #56] engine-interface.md 3-11 "A가 P1에서 추가로
+    // 할 일" 2번은 plannedAmount를 "예정일의 미래 유출"로 반영하라고 하지만,
+    // shared/types.ts의 Saving에는 그 예정일을 담을 필드가 없다(DB savings 테이블도
+    // 마찬가지 — db/schema.sql 확인). 날짜 없이 어느 날짜에 얼마를 빼야 할지 엔진이
+    // 임의로 정하면 잘못된 날짜에 이중 차감하는 쪽이 안전하지 않다고 판단해 보류한다.
+    // 대신 3-11이 명시한 데모 비트(세금 준비금 288,000원 체크 -> D-day 09-30 -> 09-23)는
+    // applySavingsCheck가 plannedAmount -> reservedAmount로 옮기는 것만으로 이미
+    // 재현된다(computeSimulationStartBalance가 reservedAmount를 항상 즉시 반영하므로).
+    // Saving에 plannedDate 같은 필드가 추가되면 그때 이 자리를 채우면 된다.
+    const newSavingsOutflow = 0;
 
     runningBalance = runningBalance + inflow - fixedOutflow - dailyBaselineRaw - newSavingsOutflow;
     const closingBalance = round.display(runningBalance);
