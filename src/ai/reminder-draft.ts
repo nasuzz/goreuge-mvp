@@ -233,7 +233,7 @@ function buildFacts(context: ReminderDraftContext): ReminderDraft["facts"] {
     { label: "미입금 경과", value: `${context.overdueDays}일` },
     { label: "요청 금액", value: won(context.amount) },
     { label: "정산 조건", value: TERM_LABEL[contract.settlementTerm] },
-    { label: "완료 이력", value: `${client.completedCount}건` },
+    { label: "지연 통계 표본", value: `${client.completedCount}건` },
   ];
 }
 

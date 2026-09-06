@@ -248,8 +248,8 @@ export function confirmContractPayment(
       : c,
   );
   const target = contracts.find((c) => c.id === contractId);
-  // recalculateClientStats는 넘긴 배열을 "이 거래처의 완료 계약"으로 그대로 센다.
-  // clientId를 스스로 거르지 않으므로 호출부가 걸러 넘겨야 completedCount가 맞는다.
+  // recalculateClientStats는 넘긴 배열을 이 거래처의 완료 계약 표본으로 본다.
+  // clientId를 스스로 거르지 않으므로 호출부가 걸러 넘겨야 지연 통계 표본이 맞는다.
   const clients = target
     ? snapshot.input.clients.map((cl) =>
         cl.id === target.clientId
