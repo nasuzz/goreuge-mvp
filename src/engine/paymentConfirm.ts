@@ -16,10 +16,8 @@ import type {
   PaymentConfirmInput,
   Rate,
 } from "../shared/types";
+import { MVP_POLICY } from "../shared/policy";
 import { diffDays } from "./scenarioDate";
-
-/** 완료 이력이 이 건수 미만이면 지연 통계를 신뢰하지 않고 null로 둔다(4-4 cold start) */
-const MIN_COMPLETED_FOR_STATS = 3;
 
 /**
  * 입금 확인. 실제 입금일과 실수령액을 받아 계약을 완료 상태로 확정한다.
@@ -85,7 +83,11 @@ export function confirmPayment(
  */
 function reverseRate(grossAmount: number, actualNetAmount: number): Rate | null {
   if (grossAmount <= 0) return null;
-  return (grossAmount - actualNetAmount) / grossAmount;
+  // [PR #59 흡수] 소수 4자리로 반올림한다. DB의 actual_rate가 numeric(5,4)라 그대로
+  // 넣으면 저장할 때 잘리고, 다시 읽어 grossAmount에 곱하면 원 단위가 어긋난다
+  // (이슈 #16에서 confirmedExpectedRate가 겪은 것과 같은 왕복 오차). 엔진이 이미
+  // 반올림한 값을 주면 저장 전후가 같아진다.
+  return Math.round(((grossAmount - actualNetAmount) / grossAmount) * 10_000) / 10_000;
 }
 
 /**
@@ -108,8 +110,25 @@ export function recalculateClientStats(
     .map((c) => Math.max(0, diffDays(c.expectedDate as string, c.actualDate as string)))
     .sort((a, b) => a - b);
 
+  // [PR #59 흡수] 하한을 하드코딩(3)하지 않고 MVP_POLICY를 쓴다. 4-4 신규 거래처
+  // 정책이 참조하는 것과 같은 기준이라, 두 군데에 따로 적어두면 한쪽만 바뀌었을 때
+  // 조용히 어긋난다.
+  //
+  // [completedCount를 지연일 표본 수로 두는 이유 — PR #59와 다른 선택]
+  // engine-interface.md 3-10은 completedCount를 "완료 건수"라고만 적었고, PR #59는
+  // 그 문장대로 넘어온 완료 계약 수를 그대로 넣었다. 그런데 이 값을 실제로 읽는
+  // 곳은 scenarioDate.ts의 resolveDelay뿐이고, 거기서 하는 일은
+  //   hasHistory = completedCount >= clientHistoryMinCount
+  //   optimistic: hasHistory ? 0 : coldStart.optimistic
+  //   baseline:   hasHistory ? (medianDelayDays ?? coldStart.baseline) : ...
+  // 다. 즉 completedCount는 "완료 건수"가 아니라 "지연 통계를 믿어도 되는가"의
+  // 게이트로 쓰인다. expectedDate가 없어 지연일을 못 내는 완료 건까지 세면
+  // hasHistory가 켜지면서 medianDelayDays는 null이라, basis는 "client_history"라고
+  // 표시되는데 값은 cold_start를 쓰는 거짓 표시가 된다. optimistic은 더 나빠서
+  // 이력이 하나도 없는데 지연 0일을 반환한다.
+  // 그래서 문장보다 소비자 쪽 계약에 맞춘다. 문서 3-10의 표현을 조이는 건 별건이다.
   const completedCount = delays.length;
-  if (completedCount < MIN_COMPLETED_FOR_STATS) {
+  if (completedCount < MVP_POLICY.clientHistoryMinCount) {
     return { ...client, completedCount, medianDelayDays: null, p90DelayDays: null };
   }
 

@@ -68,6 +68,19 @@ check("잠정값과 실제값이 함께 남는다", [different.expectedNetAmount
 check("공제 없이 전액 입금이면 actualRate 0", confirmPayment(contract(), { contractId: "contract-x", actualDate: "2026-11-02", actualNetAmount: 2_400_000 }, NOW).actualRate, 0);
 check("0원 입금도 허용(actualRate 1)", confirmPayment(contract(), { contractId: "contract-x", actualDate: "2026-11-02", actualNetAmount: 0 }, NOW).actualRate, 1);
 
+// [PR #59 흡수] actualRate는 소수 4자리로 반올림한다. DB의 actual_rate가 numeric(5,4)라
+// 반올림하지 않으면 저장 시 잘리고, 다시 읽어 grossAmount에 곱했을 때 원 단위가 어긋난다.
+// 3.3%처럼 딱 떨어지는 값만 보면 드러나지 않아, 나누어떨어지지 않는 금액으로 확인한다.
+{
+  // 2,400,000 - 1,000,000 = 1,400,000 / 2,400,000 = 0.58333333... -> 0.5833
+  const odd = confirmPayment(contract(), { contractId: "contract-x", actualDate: "2026-11-02", actualNetAmount: 1_000_000 }, NOW);
+  check("actualRate는 소수 4자리로 반올림 (0.58333... -> 0.5833)", odd.actualRate, 0.5833);
+  check("반올림한 값은 numeric(5,4) 왕복에서 변하지 않는다", Number((odd.actualRate as number).toFixed(4)), odd.actualRate);
+  // 1원 단위까지 살아 있는지 — 반올림한 율로 되짚어도 실수령액이 크게 튀지 않아야 한다.
+  check("역산율로 되짚은 실수령액 오차가 1,000원 미만",
+    Math.abs(2_400_000 * (1 - (odd.actualRate as number)) - 1_000_000) < 1_000, true);
+}
+
 console.log("\n── confirmPayment: 방어 ──");
 throws("총액 초과 입금이면 throw (DB chk_net_le_gross와 동일 기준)", () =>
   confirmPayment(contract(), { contractId: "contract-x", actualDate: "2026-11-02", actualNetAmount: 2_400_001 }, NOW));
