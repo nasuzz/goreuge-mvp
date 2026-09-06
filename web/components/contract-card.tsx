@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import {
+  createReminderDraft,
+  type ReminderChannel,
+  type ReminderDraft,
+  type ReminderTone,
+} from "@/ai/reminder-draft";
 import { Badge } from "@/components/ui";
 import { dateLabel, won } from "@/lib/format";
 import {
@@ -21,6 +27,12 @@ export function ContractCard({ contract }: { contract: Contract }) {
   // 사용자가 통장에 찍힌 금액을 그대로 넣게 한다(잠정값을 미리 채우면 그대로 저장된다).
   const [actualDate, setActualDate] = useState(today);
   const [actualNetAmount, setActualNetAmount] = useState("");
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderTone, setReminderTone] = useState<ReminderTone>("soft");
+  const [reminderChannel, setReminderChannel] = useState<ReminderChannel>("message");
+  const [reminderDraft, setReminderDraft] = useState<ReminderDraft | null>(null);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const clientName =
     input.clients.find((c) => c.id === contract.clientId)?.name ?? "이름 없는 거래처";
@@ -63,6 +75,51 @@ export function ContractCard({ contract }: { contract: Contract }) {
     setAction(null);
     setReason("");
     setError(null);
+  }
+
+  function generateReminder(tone: ReminderTone, channel: ReminderChannel) {
+    try {
+      const result = createReminderDraft(input, {
+        contractId: contract.id,
+        tone,
+        channel,
+      });
+      setReminderDraft(result.draft);
+      setReminderError(null);
+      setCopied(false);
+      return result;
+    } catch {
+      setReminderDraft(null);
+      setReminderError("독촉 초안을 만들 수 없는 계약입니다.");
+      return null;
+    }
+  }
+
+  function openReminder() {
+    const initial = generateReminder("soft", reminderChannel);
+    const tone = initial?.recommendedTone ?? "soft";
+    setReminderTone(tone);
+    if (tone !== "soft") generateReminder(tone, reminderChannel);
+    setReminderOpen(true);
+  }
+
+  function changeTone(tone: ReminderTone) {
+    setReminderTone(tone);
+    generateReminder(tone, reminderChannel);
+  }
+
+  function changeChannel(channel: ReminderChannel) {
+    setReminderChannel(channel);
+    generateReminder(reminderTone, channel);
+  }
+
+  async function copyReminder() {
+    if (!reminderDraft) return;
+    const text = reminderDraft.subject
+      ? `${reminderDraft.subject}\n\n${reminderDraft.body}`
+      : reminderDraft.body;
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
   }
 
   return (
@@ -121,6 +178,9 @@ export function ContractCard({ contract }: { contract: Contract }) {
           {/* [이슈 #55] 입금 확인 — 잠정값을 실제값으로 교체하고 공제율을 역산한다(3-9). */}
           {contract.status !== "cancelled" && contract.status !== "completed" && (
             <ActionButton onClick={() => setAction("payment")}>입금 확인</ActionButton>
+          )}
+          {(contract.status === "delayed" || contract.status === "risk") && (
+            <ActionButton onClick={openReminder}>독촉 문구 만들기</ActionButton>
           )}
         </div>
       ) : action === "payment" ? (
@@ -212,6 +272,84 @@ export function ContractCard({ contract }: { contract: Contract }) {
           </div>
         </div>
       )}
+
+      {reminderOpen && (
+        <div className="mt-3 rounded-xl border border-line p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold">독촉 초안</p>
+              <p className="mt-0.5 text-xs text-muted">
+                자동 발송하지 않습니다. 내용 확인 후 복사만 할 수 있습니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReminderOpen(false)}
+              className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs text-muted hover:text-foreground"
+            >
+              닫기
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <SegmentedControl
+              label="어조"
+              value={reminderTone}
+              options={[
+                ["soft", "부드럽게"],
+                ["standard", "일반"],
+                ["firm", "단호하게"],
+              ]}
+              onChange={(value) => changeTone(value as ReminderTone)}
+            />
+            <SegmentedControl
+              label="채널"
+              value={reminderChannel}
+              options={[
+                ["message", "카톡"],
+                ["email", "메일"],
+              ]}
+              onChange={(value) => changeChannel(value as ReminderChannel)}
+            />
+          </div>
+
+          {reminderError && (
+            <p role="alert" className="mt-2 text-xs text-danger">
+              {reminderError}
+            </p>
+          )}
+
+          {reminderDraft && (
+            <>
+              {reminderDraft.subject && (
+                <div className="mt-3 rounded-lg bg-surface-muted px-3 py-2 text-sm">
+                  <span className="text-xs text-muted">제목 · </span>
+                  {reminderDraft.subject}
+                </div>
+              )}
+              <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-surface-muted px-3 py-2 text-sm leading-6 font-sans">
+                {reminderDraft.body}
+              </pre>
+              <p className="mt-2 text-xs text-muted">{reminderDraft.toneReason}</p>
+              <dl className="mt-3 grid grid-cols-2 gap-2">
+                {reminderDraft.facts.map((fact) => (
+                  <div key={fact.label} className="rounded-lg border border-line px-2.5 py-2">
+                    <dt className="text-[11px] text-muted">{fact.label}</dt>
+                    <dd className="tnum mt-0.5 text-xs font-medium">{fact.value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <button
+                type="button"
+                onClick={copyReminder}
+                className="mt-3 w-full rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background"
+              >
+                {copied ? "복사됨" : "복사하기"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </li>
   );
 }
@@ -231,5 +369,38 @@ function ActionButton({
     >
       {children}
     </button>
+  );
+}
+
+function SegmentedControl({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: [string, string][];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-1 text-[11px] font-medium text-muted">{label}</p>
+      <div className="grid grid-cols-[repeat(var(--segment-count),minmax(0,1fr))] rounded-lg border border-line p-0.5" style={{ "--segment-count": options.length } as React.CSSProperties}>
+        {options.map(([key, text]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            aria-pressed={value === key}
+            className={`rounded-md px-2 py-1.5 text-xs ${
+              value === key ? "bg-foreground text-background" : "text-muted hover:text-foreground"
+            }`}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
