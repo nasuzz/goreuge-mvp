@@ -12,14 +12,15 @@ usage() {
       로컬 release check만 실행한다: 루트 verify, web build/typecheck/lint, 비밀값·개인정보 스캔.
 
   scripts/deploy.sh --prod --smoke
-      web/ 기준 Vercel production 배포 후 배포 URL에 API smoke를 실행한다.
+      저장소 루트에서 Vercel production 배포 후(Root Directory=web은 Vercel 프로젝트
+      설정이 처리한다) 배포 URL에 API smoke를 실행한다.
 
   scripts/deploy.sh --api-base https://<배포url> --smoke
       이미 배포된 URL만 검증한다 (배포는 하지 않는다).
 
 옵션:
   --check           로컬 검증(verify·web build/typecheck/lint·비밀값 스캔)만 실행
-  --prod            web/ 기준 `vercel --prod` 배포
+  --prod            저장소 루트에서 `vercel --prod` 배포 (Root Directory는 Vercel 프로젝트 설정을 따름)
   --smoke           test/api-smoke.mjs 실행 (기본은 --skip-mutating)
   --mutating-smoke  smoke를 전체 모드로 실행 (데모 데이터를 실제로 바꾼다. docs/release.md 2-2 재시드 필요)
   --api-base <url>  smoke 대상 URL을 직접 지정한다 (--prod 없이도 사용 가능, --prod와는 같이 못 씀)
@@ -89,17 +90,28 @@ run_check() {
     npm run lint
   )
 
-  echo "== [3/3] 비밀값·개인정보 스캔 (origin/main 기준, docs/release.md 4장과 동일한 명령) =="
+  echo "== [3/3] 비밀값·개인정보 스캔 (현재 작업트리 기준 — --prod가 실제로 업로드하는 대상과 동일) =="
   git fetch origin --quiet
 
-  # [주의] docs/release.md 자체가 이 절의 예시로 아래와 동일한 정규식을 문서화하고
-  # 있어서, 이 파일을 스캔 대상에 넣으면 자기 자신의 예시 텍스트에 항상 걸린다
-  # (실측: lyoonji, 이슈 #43). 그래서 docs/release.md만 명시적으로 제외한다 —
-  # 나머지 파일에 같은 문자열이 진짜 값으로 들어오는 것까지 놓치지는 않는다.
+  # [이슈 #43·PR #44 리뷰 반영, lyoonji]
+  #  - 원래 origin/main을 스캔했는데, `vercel --prod`는 로컬 작업트리를 그대로
+  #    올린다(git push로 트리거되는 배포가 아니다). 그래서 origin/main에 없는
+  #    아직 커밋 전 변경이나 로컬 전용 브랜치의 키가 있어도 origin/main 스캔은
+  #    깨끗하다고 통과시키고 그 코드는 그대로 배포됐다. 스캔 대상을 실제
+  #    업로드 대상(현재 작업트리)으로 맞췄다.
+  #  - docs/release.md 전체를 스캔에서 빼면(예전 방식) 그 파일에 진짜 키가
+  #    들어와도 못 잡는 사각지대가 생긴다. 대신 그 파일이 이 정규식 자체를
+  #    예시로 문서화해 둔 "그 한 줄"만 결과에서 걸러낸다.
+  #  - 이 스크립트 자신(scripts/deploy.sh)도 같은 정규식 문자열을 코드로
+  #    담고 있어서(바로 이 줄) origin/main 제외를 걷어내자 새로 자기 자신에게
+  #    걸리는 게 실제로 재현됐다. docs/release.md와 달리 이건 "예시 한 줄"이
+  #    아니라 패턴 정의 자체라 줄 단위로 거르기 어려워, 파일 전체를 뺀다 —
+  #    탐지 로직을 담은 파일이니 진짜 비밀값이 여기 섞일 일은 없다.
   local secret_hits
   secret_hits="$(git grep -nIE \
     "(eyJ[A-Za-z0-9_-]{30,})|(sk-[A-Za-z0-9]{20,})|(sb_secret_[A-Za-z0-9_-]{10,})|(service_role)|(-----BEGIN [A-Z ]*PRIVATE KEY)" \
-    origin/main -- . ':!*.lock' ':!package-lock.json' ':!docs/release.md' || true)"
+    -- . ':!*.lock' ':!package-lock.json' ':!scripts/deploy.sh' \
+    | grep -v 'docs/release\.md:.*git grep -nIE' || true)"
   if [ -n "$secret_hits" ]; then
     echo "$secret_hits"
     echo "오류: 비밀키로 의심되는 패턴이 발견됐습니다. 위 목록을 확인하세요." >&2
@@ -107,7 +119,7 @@ run_check() {
   fi
 
   local env_files
-  env_files="$(git ls-tree -r --name-only origin/main | grep -E '\.env' | grep -v '\.env\.example$' || true)"
+  env_files="$(git ls-files | grep -E '\.env' | grep -v '\.env\.example$' || true)"
   if [ -n "$env_files" ]; then
     echo "$env_files"
     echo "오류: .env 계열 파일이 커밋돼 있습니다 (.env.example 제외)." >&2
@@ -125,7 +137,7 @@ run_check() {
   local pii_hits
   pii_hits="$(git grep -nIE \
     "01[0-9]-[0-9]{3,4}-[0-9]{4}|[A-Za-z0-9._%+-]+@(gmail|naver|daum|kakao|hanmail)\.[a-z]{2,3}" \
-    origin/main -- . ':!*.lock' ':!package-lock.json' || true)"
+    -- . ':!*.lock' ':!package-lock.json' || true)"
   if [ -n "$pii_hits" ]; then
     echo "$pii_hits"
     echo "오류: 개인 전화번호·이메일로 의심되는 패턴이 발견됐습니다." >&2
@@ -138,17 +150,22 @@ run_check() {
 # ── 2. Vercel production 배포 (docs/release.md 1장) ────────────────────
 
 run_prod() {
-  echo "== Vercel production 배포 (web/) =="
+  echo "== Vercel production 배포 (저장소 루트에서 실행) =="
   command -v vercel >/dev/null 2>&1 || {
     echo "오류: vercel CLI가 필요합니다 (예: npx vercel, 또는 npm i -g vercel)" >&2
     exit 1
   }
 
-  # [이슈 #43, lyoonji 리뷰 반영] DEMO_USER_ID가 없으면 API가 "가장 먼저
-  # 온보딩한 사용자"를 골라 화면이 빈 상태로 뜬다 (근거: 이슈 #23). 배포 전에
-  # 최소한 존재 여부만 확인한다 — 값 자체는 비밀이라 여기서 노출하지 않는다.
+  # [PR #44 리뷰 반영, lyoonji — P0] `vercel` CLI는 현재 디렉터리를 그대로
+  # 업로드한다. web/에서 실행하면 web/만 올라가는데, 이 앱은 tsconfig의
+  # `@/shared/*`·`@/engine/*`·`@/ai/*` 경로 별칭으로 저장소 루트의 ../src를
+  # 40곳 넘게 참조한다(web/next.config.ts의 turbopack.root 설정과 같은
+  # 이유). web/에서 배포하면 Root Directory 미설정 시 ../src가 안 올라가
+  # 빌드가 깨지고, 설정돼 있으면 web/web을 찾아 다른 방식으로 깨진다.
+  # 반드시 저장소 루트에서 실행해야 Vercel 프로젝트의 "Root Directory: web"
+  # 설정과 맞물린다.
   echo "-- 필수 환경변수 존재 확인 (DEMO_USER_ID) --"
-  if ! (cd web && vercel env ls production 2>/dev/null | grep -q "DEMO_USER_ID"); then
+  if ! (vercel env ls production 2>/dev/null | grep -q "DEMO_USER_ID"); then
     echo "경고: Vercel production 환경변수 목록에서 DEMO_USER_ID를 확인하지 못했습니다." >&2
     echo "  미설정 시 데모 화면이 빈 계정으로 뜰 수 있습니다 (docs/release.md 1-2절 참고)." >&2
     if [ -t 0 ]; then
@@ -163,7 +180,7 @@ run_prod() {
   fi
 
   local deploy_output
-  deploy_output="$(cd web && vercel --prod --yes)"
+  deploy_output="$(vercel --prod --yes)"
   echo "$deploy_output"
   # vercel CLI는 성공 시 마지막 줄에 배포 URL만 출력한다.
   API_BASE="$(echo "$deploy_output" | tail -1)"
