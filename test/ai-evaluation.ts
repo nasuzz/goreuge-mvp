@@ -44,6 +44,10 @@ const unlabeledCases = dataset.cases.filter((testCase) =>
   testCase.tags.some((tag) => tag.startsWith("unlabeled_client_")),
 );
 if (unlabeledCases.length < 5) failures.push(`무라벨 거래처 평가 문장은 최소 5건이어야 합니다. 현재 ${unlabeledCases.length}건`);
+const labeledCases = dataset.cases.filter((testCase) =>
+  testCase.tags.includes("labeled_client_colon"),
+);
+if (labeledCases.length < 3) failures.push(`라벨형 거래처 평가 문장은 최소 3건이어야 합니다. 현재 ${labeledCases.length}건`);
 
 for (const testCase of dataset.cases) {
   const { candidate } = parseContractDeterministically(testCase.text, { referenceDate: dataset.referenceDate });
@@ -166,6 +170,14 @@ async function main() {
   ).candidate;
   if (naturalClient.clientName !== "K스튜디오" || naturalClient.confidence.clientName !== 0.7 || !naturalClient.needsReview) {
     failures.push("무라벨 '<거래처> <작업명> 건' 문장을 낮은 confidence의 확인 후보로 만들지 못했습니다.");
+  }
+
+  const labeledClient = parseContractDeterministically(
+    "거래처: M프로덕션 총 180만원, 완료 2026-09-10, 익월 말일",
+    { referenceDate: dataset.referenceDate },
+  ).candidate;
+  if (labeledClient.clientName !== "M프로덕션") {
+    failures.push("라벨형 거래처 문장에서 금액 문구를 거래처명에 포함했습니다.");
   }
 
   const projectOnly = parseContractDeterministically(
