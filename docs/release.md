@@ -48,8 +48,11 @@ scripts/deploy.sh --api-base https://<배포url> --smoke  # 이미 배포된 URL
 | `SUPABASE_SECRET_KEY` | A가 공유한 값 | `NEXT_PUBLIC_` 접두사 금지 (D5-a) |
 | `DEMO_USER_ID` | `a0000000-0000-4000-8000-000000000001` | **아래 경고 참고** |
 | `DEMO_TODAY` | `2026-09-01` | 비우면 실제 KST 날짜를 쓴다 |
-| `OPENAI_API_KEY` | B가 공유한 값 | #27·#29 머지 후 |
-| `OPENAI_MODEL` | `gpt-5.4-mini` | #27·#29 머지 후 |
+| `GEMINI_API_KEY` | B가 Google AI Studio에서 만든 값 | 서버 전용, `NEXT_PUBLIC_` 접두사 금지 |
+| `GEMINI_MODEL` | `gemini-3-flash-preview` | Gemini 무료 tier 대상 모델. 필요 시 교체 |
+
+PR Preview URL 대상으로 `test/api-smoke.mjs`를 돌릴 때는 같은 값을 Preview 환경에도 넣는다.
+Production에만 넣으면 Preview 배포 자체는 성공해도 API route가 500을 반환한다.
 
 > **`DEMO_USER_ID`를 반드시 넣을 것.** 미설정 시 API 라우트가 "가장 먼저 온보딩한
 > 사용자"를 고르는데, 현재 DB에는 데모 계정 외에 2026-09-03에 생성된 계정이 하나 더
@@ -61,7 +64,8 @@ scripts/deploy.sh --api-base https://<배포url> --smoke  # 이미 배포된 URL
 
 ### 2-1. API 스모크
 
-`scripts/deploy.sh --api-base https://<배포url> --smoke`가 아래를 실행한다.
+`scripts/deploy.sh --api-base https://<배포url> --smoke`는 아래 두 번째 `--skip-mutating`
+명령과 같은 안전 모드로 실행한다. 옵션 없이 직접 돌리는 첫 번째 명령은 전체 스모크다.
 
 ```bash
 API_BASE=https://<배포url> node test/api-smoke.mjs
@@ -70,8 +74,8 @@ API_BASE=https://<배포url> node test/api-smoke.mjs
 0~5단계를 자동 검증한다. 실패 0건이어야 한다. 종료 코드로 성공을 판정할 수 있다
 (성공 0 / 실패·중단 1).
 
-**4단계가 데모 계약을 실제로 `risk`로 바꾸고 임시 유저를 남긴다.** 데모 직전이라면
-`--skip-mutating`으로 돌리고, 이미 돌렸다면 재시드한다.
+위 명령처럼 옵션 없이 직접 돌리면 4단계가 데모 계약을 실제로 `risk`로 바꾸고 임시 유저를
+남긴다. 데모 직전이라면 `--skip-mutating`으로 돌리고, 이미 돌렸다면 재시드한다.
 
 ```bash
 API_BASE=https://<배포url> node test/api-smoke.mjs --skip-mutating
@@ -165,7 +169,7 @@ node db/seed-demo.mjs > db/seed-demo.sql
 스크립트를 만들며 드러난 구멍이다.)
 
 ```bash
-git grep -nIE "(eyJ[A-Za-z0-9_-]{30,})|(sk-[A-Za-z0-9]{20,})|(sb_secret_[A-Za-z0-9_-]{10,})|(service_role)|(-----BEGIN [A-Z ]*PRIVATE KEY)" -- . ':!*.lock' ':!package-lock.json' ':!scripts/deploy.sh'
+git grep -nIE "(eyJ[A-Za-z0-9_-]{30,})|(sk-[A-Za-z0-9]{20,})|(AIza[A-Za-z0-9_-]{20,})|(sb_secret_[A-Za-z0-9_-]{10,})|(service_role)|(-----BEGIN [A-Z ]*PRIVATE KEY)" -- . ':!*.lock' ':!package-lock.json' ':!scripts/deploy.sh'
 git ls-files | grep -E "\.env" | grep -v "\.env\.example$"
 git log --all --diff-filter=A --name-only --format="" | sort -u | grep -E "\.env($|\.local|\.production)"
 git grep -nIE "01[0-9]-[0-9]{3,4}-[0-9]{4}|[A-Za-z0-9._%+-]+@(gmail|naver|daum|kakao|hanmail)\.[a-z]{2,3}" -- . ':!*.lock' ':!package-lock.json'
