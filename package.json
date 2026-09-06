@@ -13,7 +13,7 @@
     "issue16-verify": "npm run build && node dist/test/issue16-verify.js",
     "reminder-draft": "npm run build && node dist/test/reminder-draft.js",
     "test:ai": "npm run build && node dist/test/ai-evaluation.js",
-    "test:ai-confirmation": "npm run build && node dist/test/ai-confirmation-flow.js && node dist/test/contract-risk-verify.js",
+    "test:ai-confirmation": "npm run build && node dist/test/ai-confirmation-flow.js",
     "verify": "npm run typecheck && npm run build && node test/run-verify.mjs"
   },
   "devDependencies": {

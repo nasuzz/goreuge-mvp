@@ -1,5 +1,6 @@
 import type { AIContractCandidate, DateString } from "../shared/types";
 import { CONFIDENCE_THRESHOLD } from "../shared/policy";
+import type { FieldEvidence } from "./evidence";
 
 export type ConfidenceTone = "normal" | "warning" | "danger";
 export type CandidateField = keyof AIContractCandidate["confidence"];
@@ -9,6 +10,14 @@ export interface CandidateFieldReview {
   confidence: number;
   tone: ConfidenceTone;
   missing: boolean;
+  /**
+   * [#48] 이 값이 원문 어디에서 왔는지와 자기 검증 결과.
+   *
+   * 확인 모달이 원문을 함께 보여주고 이 구간을 강조하면, 사용자가 "이 값이 어디서
+   * 나왔지"를 스스로 확인할 수 있다. AI 출력에는 근거 구간이 없으므로 결정적
+   * 파서로 읽었을 때만 채워진다 — 없으면 null이고 화면은 기존대로 그린다.
+   */
+  evidence: FieldEvidence | null;
 }
 
 export interface ConfirmationGate {
@@ -91,12 +100,16 @@ export function recomputeMissingFields(
   );
 }
 
-export function getCandidateFieldReviews(candidate: AIContractCandidate): CandidateFieldReview[] {
+export function getCandidateFieldReviews(
+  candidate: AIContractCandidate,
+  evidence: FieldEvidence[] = [],
+): CandidateFieldReview[] {
   return (Object.keys(candidate.confidence) as CandidateField[]).map((field) => ({
     field,
     confidence: candidate.confidence[field],
     tone: getConfidenceTone(candidate.confidence[field]),
     missing: candidate.missingFields.includes(field),
+    evidence: evidence.find((entry) => entry.field === field) ?? null,
   }));
 }
 

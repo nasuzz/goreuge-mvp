@@ -15,6 +15,11 @@ export interface AIConfirmationViewModel {
   fallbackNotice: string | null;
   fields: CandidateFieldReview[];
   gate: ConfirmationGate;
+  /**
+   * [#48] 근거 구간이 가리키는 원문(공백 정규화본). 확인 모달이 이 문자열 위에
+   * `fields[].evidence.span`을 강조한다. AI 경로에는 근거 구간이 없어 null이다.
+   */
+  evidenceText: string | null;
 }
 
 const FALLBACK_NOTICE =
@@ -34,8 +39,9 @@ export function buildAIConfirmationViewModel(
     source: result.source,
     warnings: [...result.warnings],
     fallbackNotice: result.source === "deterministic_fallback" ? FALLBACK_NOTICE : null,
-    fields: getCandidateFieldReviews(result.candidate),
+    fields: getCandidateFieldReviews(result.candidate, result.evidence),
     gate: getConfirmationGate(result.candidate, userReviewed, manualExpectedDate),
+    evidenceText: result.normalizedText ?? null,
   };
 }
 
@@ -46,10 +52,35 @@ export function rebuildAIConfirmationViewModel(
   userReviewed: boolean,
   manualExpectedDate: DateString | null = null,
 ): AIConfirmationViewModel {
+  // [#48] 사용자가 고친 필드의 근거는 더 이상 그 값을 설명하지 않는다. 그대로 두면
+  // 원문 하이라이트가 사용자가 지운 값을 계속 가리킨다. 값이 그대로인 필드의
+  // 근거만 넘긴다.
+  const keptEvidence = previous.fields
+    .filter((field) => field.evidence !== null && !isFieldEdited(previous.candidate, candidate, field.field))
+    .map((field) => field.evidence!);
+
   return {
     ...previous,
     candidate,
-    fields: getCandidateFieldReviews(candidate),
+    fields: getCandidateFieldReviews(candidate, keptEvidence),
     gate: getConfirmationGate(candidate, userReviewed, manualExpectedDate),
   };
+}
+
+function isFieldEdited(
+  before: AIContractCandidate,
+  after: AIContractCandidate,
+  field: CandidateFieldReview["field"],
+): boolean {
+  switch (field) {
+    case "clientName": return before.clientName !== after.clientName;
+    case "grossAmount": return before.grossAmount !== after.grossAmount;
+    case "payerStatedNetAmountCandidate":
+      return before.payerStatedNetAmountCandidate !== after.payerStatedNetAmountCandidate;
+    case "completionDate": return before.completionDate !== after.completionDate;
+    case "settlementTerm":
+      return before.settlementTerm !== after.settlementTerm || before.settlementDay !== after.settlementDay;
+    case "incomeTypeCandidate": return before.incomeTypeCandidate !== after.incomeTypeCandidate;
+    default: return true;
+  }
 }

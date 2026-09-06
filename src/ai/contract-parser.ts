@@ -1,6 +1,15 @@
 import type { AIContractCandidate, DateString } from "../shared/types";
 import type { IncomeType, SettlementTerm } from "../shared/enums";
 import { CONFIDENCE_THRESHOLD } from "../shared/policy";
+import {
+  checkRoundTrip,
+  spanOf,
+  verifyField,
+  type EvidenceField,
+  type Extracted,
+  type FieldEvidence,
+  type TextSpan,
+} from "./evidence";
 
 export interface ParseContractOptions {
   /** 연도가 생략된 날짜를 해석하는 기준일. 화면/API에서 오늘(KST)을 주입한다. */
@@ -11,6 +20,10 @@ export interface ParseContractResult {
   candidate: AIContractCandidate;
   source: "deterministic_fallback";
   warnings: string[];
+  /** [#48] 필드별 근거 구간과 자기 검증 결과. 확인 모달이 원문 하이라이트에 쓴다 */
+  evidence: FieldEvidence[];
+  /** evidence의 span이 가리키는 대상. 공백을 정규화한 원문이라 원본과 오프셋이 다르다 */
+  normalizedText: string;
 }
 
 const KOREAN_DIGITS: Record<string, number> = {
@@ -41,19 +54,23 @@ function parseKoreanNumber(value: string): number | null {
   return section + digit;
 }
 
-interface AmountMention { index: number; amount: number }
+interface AmountMention { index: number; amount: number; raw: string }
 
 function findAmountMentions(text: string): AmountMention[] {
-  const matches: { index: number; amount: number }[] = [];
+  const matches: AmountMention[] = [];
   const numeric = /(\d[\d,]*(?:\.\d+)?)\s*(만원|원)/g;
   for (const match of text.matchAll(numeric)) {
     const value = Number(match[1].replace(/,/g, ""));
-    matches.push({ index: match.index ?? 0, amount: Math.round(value * (match[2] === "만원" ? 10_000 : 1)) });
+    matches.push({
+      index: match.index ?? 0,
+      amount: Math.round(value * (match[2] === "만원" ? 10_000 : 1)),
+      raw: match[0],
+    });
   }
   const korean = /([일이삼사오육칠팔구십백천]+)\s*만원/g;
   for (const match of text.matchAll(korean)) {
     const value = parseKoreanNumber(match[1]);
-    if (value != null) matches.push({ index: match.index ?? 0, amount: value * 10_000 });
+    if (value != null) matches.push({ index: match.index ?? 0, amount: value * 10_000, raw: match[0] });
   }
   return matches.sort((a, b) => a.index - b.index);
 }
@@ -71,21 +88,28 @@ function parseAmountToken(raw: string, unit: string): number | null {
   return Math.round(value * (unit === "만원" ? 10_000 : 1));
 }
 
-function extractAmount(text: string, warnings: string[]): { value: number | null; confidence: number } {
-  const amounts = findAmountMentions(text)
+function extractAmount(text: string, warnings: string[]): Extracted<number | null> {
+  const mentions = findAmountMentions(text)
     .filter((mention) => !isPayerAmountContext(text, mention.index))
-    .map((mention) => mention.amount)
-    .filter((amount) => amount >= 10_000);
-  if (amounts.length === 0) return { value: null, confidence: 0 };
+    .filter((mention) => mention.amount >= 10_000);
+  const amounts = mentions.map((mention) => mention.amount);
+  if (amounts.length === 0) return { value: null, confidence: 0, span: null };
 
   const unique = [...new Set(amounts)];
   const totalText = text.match(/(?:총액|계약\s*금액|총)\s*(?:은|는|:)??\s*([일이삼사오육칠팔구십백천]+|\d[\d,]*(?:\.\d+)?)\s*(만원|원)/);
   let value = amounts.at(-1) ?? null;
+  // 근거 구간은 값을 실제로 고른 자리를 가리킨다. 총액 라벨을 썼으면 그 구간,
+  // 아니면 마지막 금액 표현 구간이다.
+  const last = mentions.at(-1);
+  let span = last ? spanOf(text, last.index, last.raw.length) : null;
   if (totalText && !/정정|변경/.test(text)) {
     const raw = /^\d/.test(totalText[1])
       ? Number(totalText[1].replace(/,/g, ""))
       : parseKoreanNumber(totalText[1]);
-    value = raw == null ? value : Math.round(raw * (totalText[2] === "만원" ? 10_000 : 1));
+    if (raw != null) {
+      value = Math.round(raw * (totalText[2] === "만원" ? 10_000 : 1));
+      span = spanOf(text, totalText.index ?? 0, totalText[0].length);
+    }
   }
   let confidence = unique.length === 1 ? 0.96 : 0.62;
   if (unique.length > 1 && /선금|잔금|분할/.test(text) && totalText) confidence = 0.72;
@@ -100,13 +124,14 @@ function extractAmount(text: string, warnings: string[]): { value: number | null
     confidence = Math.min(confidence, 0.45);
     warnings.push("분할 지급은 MVP에서 계약을 나눠 등록해야 합니다.");
   }
-  return { value, confidence };
+  return { value, confidence, span };
 }
 
 interface PayerNetExtraction {
   value: number | null;
   confidence: number;
   needsResolution: boolean;
+  span: TextSpan | null;
 }
 
 /**
@@ -144,14 +169,16 @@ function extractPayerStatedNetAmount(
     new RegExp(`${amount}\\s*(?:을|를)?\\s*(?:공제|제외|차감)`, "g"),
   ];
 
-  const direct = collectPatternAmounts(text, directPatterns);
-  const deductions = collectPatternAmounts(text, deductionPatterns);
+  const directHits = collectPatternMatches(text, directPatterns);
+  const deductionHits = collectPatternMatches(text, deductionPatterns);
+  const direct = directHits.map((hit) => hit.value);
+  const deductions = deductionHits.map((hit) => hit.value);
   const uniqueDirect = [...new Set(direct)];
   const uniqueDeductions = [...new Set(deductions)];
 
   if (uniqueDirect.length > 1 || uniqueDeductions.length > 1) {
     warnings.push("지급처 안내 금액이 서로 달라 실수령액 후보를 확정할 수 없습니다.");
-    return { value: null, confidence: 0, needsResolution: true };
+    return { value: null, confidence: 0, needsResolution: true, span: null };
   }
 
   const directValue = uniqueDirect[0] ?? null;
@@ -159,14 +186,14 @@ function extractPayerStatedNetAmount(
   if (uniqueDeductions.length === 1) {
     if (grossAmount === null) {
       warnings.push("공제액은 안내됐지만 계약 총액이 없어 실수령액 후보를 계산할 수 없습니다.");
-      return { value: null, confidence: 0, needsResolution: true };
+      return { value: null, confidence: 0, needsResolution: true, span: deductionHits[0]?.span ?? null };
     }
     deductedValue = grossAmount - uniqueDeductions[0];
   }
 
   if (directValue !== null && deductedValue !== null && directValue !== deductedValue) {
     warnings.push("직접 안내된 실수령액과 공제액으로 계산한 금액이 일치하지 않습니다.");
-    return { value: null, confidence: 0, needsResolution: true };
+    return { value: null, confidence: 0, needsResolution: true, span: directHits[0]?.span ?? null };
   }
 
   const value = directValue ?? deductedValue;
@@ -186,28 +213,29 @@ function extractPayerStatedNetAmount(
     // 아래로 내려 확인 모달에서 빨간 톤이 되게 한다.
     if (hasUnparsedPayerAmountHint(text)) {
       warnings.push("지급처가 안내한 금액으로 보이는 표현이 있지만 정확히 읽지 못했습니다. 직접 확인해 주세요.");
-      return { value: null, confidence: 0.3, needsResolution: false };
+      return { value: null, confidence: 0.3, needsResolution: false, span: null };
     }
-    return { value: null, confidence: 1, needsResolution: false };
+    return { value: null, confidence: 1, needsResolution: false, span: null };
   }
   if (!Number.isInteger(value) || value < 0 || (grossAmount !== null && value > grossAmount)) {
     warnings.push("지급처 안내 실수령액이 계약 총액 범위를 벗어나 사용자 확인이 필요합니다.");
-    return { value: null, confidence: 0, needsResolution: true };
+    return { value: null, confidence: 0, needsResolution: true, span: null };
   }
-  return { value, confidence: directValue !== null ? 0.98 : 0.92, needsResolution: false };
+  const span = directValue !== null ? directHits[0]?.span ?? null : deductionHits[0]?.span ?? null;
+  return { value, confidence: directValue !== null ? 0.98 : 0.92, needsResolution: false, span };
 }
 
-function collectPatternAmounts(text: string, patterns: RegExp[]): number[] {
-  const values: number[] = [];
+interface PatternHit { value: number; span: TextSpan }
+
+function collectPatternMatches(text: string, patterns: RegExp[]): PatternHit[] {
+  const hits: PatternHit[] = [];
   for (const pattern of patterns) {
     for (const match of text.matchAll(pattern)) {
-      const raw = match[1];
-      const unit = match[2];
-      const value = parseAmountToken(raw, unit);
-      if (value !== null) values.push(value);
+      const value = parseAmountToken(match[1], match[2]);
+      if (value !== null) hits.push({ value, span: spanOf(text, match.index ?? 0, match[0].length) });
     }
   }
-  return values;
+  return hits;
 }
 
 function pad(value: number): string {
@@ -220,44 +248,92 @@ function validDate(year: number, month: number, day: number): DateString | null 
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
-function extractCompletionDate(text: string, referenceDate: DateString): { value: DateString | null; confidence: number } {
+function extractCompletionDate(text: string, referenceDate: DateString): Extracted<DateString | null> {
   const keywordPattern = /(?:(\d{4})[년./-]\s*)?(\d{1,2})[월./-]\s*(\d{1,2})일?\s*(?:납품|완료|마감|검수)/g;
   const reversePattern = /(?:납품|완료|마감|검수)(?:일|일자| 예정| 예정일)?(?:은|는|:)?\s*(?:(\d{4})[년./-]\s*)?(\d{1,2})[월./-]\s*(\d{1,2})일?/g;
   const candidates = [...text.matchAll(keywordPattern), ...text.matchAll(reversePattern)];
-  if (candidates.length === 0) return { value: null, confidence: 0 };
+  if (candidates.length === 0) return { value: null, confidence: 0, span: null };
   const match = candidates.at(-1)!;
   const year = Number(match[1] || referenceDate.slice(0, 4));
   const value = validDate(year, Number(match[2]), Number(match[3]));
-  return { value, confidence: value ? (match[1] ? 0.98 : 0.88) : 0 };
+  return {
+    value,
+    confidence: value ? (match[1] ? 0.98 : 0.88) : 0,
+    span: spanOf(text, match.index ?? 0, match[0].length),
+  };
 }
 
-function extractSettlement(text: string): { term: SettlementTerm; day: number | null; confidence: number } {
-  if (/익월\s*말일|다음\s*달\s*말일/.test(text)) return { term: "NEXT_MONTH_END", day: null, confidence: 0.98 };
-  if (/당월\s*말일|이번\s*달\s*말일/.test(text)) return { term: "SAME_MONTH_END", day: null, confidence: 0.98 };
-  const nextMonthDay = text.match(/(?:익월|다음\s*달)\s*(\d{1,2})일/);
-  if (nextMonthDay) return { term: "NEXT_MONTH_DAY", day: Number(nextMonthDay[1]), confidence: 0.96 };
-  const netDays = text.match(/(?:완료|납품|청구)(?:일)?\s*(?:후|로부터)\s*(\d{1,3})일/);
-  if (netDays) return { term: "NET_DAYS", day: Number(netDays[1]), confidence: 0.96 };
-  if (/완료\s*즉시|납품\s*즉시/.test(text)) return { term: "ON_COMPLETION", day: null, confidence: 0.96 };
-  return { term: "UNKNOWN", day: null, confidence: 0 };
+interface SettlementExtraction extends Extracted<SettlementTerm> {
+  day: number | null;
 }
 
-function extractIncomeType(text: string): { value: IncomeType; confidence: number } {
-  if (/3\.3\s*%|사업소득|인적용역/.test(text)) return { value: "business_personal_service", confidence: 0.93 };
-  if (/8\.8\s*%|기타소득/.test(text)) return { value: "qualifying_other_income", confidence: 0.82 };
-  if (/근로소득|급여/.test(text)) return { value: "employment_income", confidence: 0.9 };
-  if (/공제\s*(?:없음|없이|없습니다)|원천징수\s*(?:없음|없이|없습니다)/.test(text)) return { value: "no_withholding", confidence: 0.9 };
-  return { value: "needs_review", confidence: 0.2 };
+function settlementHit(
+  text: string,
+  pattern: RegExp,
+  term: SettlementTerm,
+  day: number | null,
+  confidence: number,
+): SettlementExtraction {
+  const match = text.match(pattern);
+  return {
+    value: term,
+    day,
+    confidence,
+    span: match ? spanOf(text, match.index ?? 0, match[0].length) : null,
+  };
 }
 
-function extractClientName(text: string): { value: string | null; confidence: number } {
+function extractSettlement(text: string): SettlementExtraction {
+  const nextMonthEnd = /익월\s*말일|다음\s*달\s*말일/;
+  if (nextMonthEnd.test(text)) return settlementHit(text, nextMonthEnd, "NEXT_MONTH_END", null, 0.98);
+  const sameMonthEnd = /당월\s*말일|이번\s*달\s*말일/;
+  if (sameMonthEnd.test(text)) return settlementHit(text, sameMonthEnd, "SAME_MONTH_END", null, 0.98);
+  const nextMonthDayPattern = /(?:익월|다음\s*달)\s*(\d{1,2})일/;
+  const nextMonthDay = text.match(nextMonthDayPattern);
+  if (nextMonthDay) {
+    return settlementHit(text, nextMonthDayPattern, "NEXT_MONTH_DAY", Number(nextMonthDay[1]), 0.96);
+  }
+  const netDaysPattern = /(?:완료|납품|청구)(?:일)?\s*(?:후|로부터)\s*(\d{1,3})일/;
+  const netDays = text.match(netDaysPattern);
+  if (netDays) return settlementHit(text, netDaysPattern, "NET_DAYS", Number(netDays[1]), 0.96);
+  const onCompletion = /완료\s*즉시|납품\s*즉시/;
+  if (onCompletion.test(text)) return settlementHit(text, onCompletion, "ON_COMPLETION", null, 0.96);
+  return { value: "UNKNOWN", day: null, confidence: 0, span: null };
+}
+
+function incomeHit(text: string, pattern: RegExp, value: IncomeType, confidence: number): Extracted<IncomeType> {
+  const match = text.match(pattern);
+  return { value, confidence, span: match ? spanOf(text, match.index ?? 0, match[0].length) : null };
+}
+
+function extractIncomeType(text: string): Extracted<IncomeType> {
+  const business = /3\.3\s*%|사업소득|인적용역/;
+  if (business.test(text)) return incomeHit(text, business, "business_personal_service", 0.93);
+  const other = /8\.8\s*%|기타소득/;
+  if (other.test(text)) return incomeHit(text, other, "qualifying_other_income", 0.82);
+  const employment = /근로소득|급여/;
+  if (employment.test(text)) return incomeHit(text, employment, "employment_income", 0.9);
+  const none = /공제\s*(?:없음|없이|없습니다)|원천징수\s*(?:없음|없이|없습니다)/;
+  if (none.test(text)) return incomeHit(text, none, "no_withholding", 0.9);
+  return { value: "needs_review", confidence: 0.2, span: null };
+}
+
+function extractClientName(text: string): Extracted<string | null> {
   const explicitPatterns = [
     /(?:거래처|클라이언트|발신|From)\s*[:：]\s*([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._-]{1,24})/i,
     /^\s*\[([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._ -]{1,24})\]/,
   ];
   for (const pattern of explicitPatterns) {
     const match = text.match(pattern);
-    if (match) return { value: match[1].trim(), confidence: 0.96 };
+    if (match) {
+      return {
+        value: match[1].trim(),
+        confidence: 0.96,
+        // 근거 구간은 값만이 아니라 라벨까지 포함한다. 값만 잘라두면 그 구간을
+        // 다시 읽어도 라벨이 없어 매치되지 않아 round-trip이 항상 실패한다.
+        span: spanOf(text, match.index ?? 0, match[0].length),
+      };
+    }
   }
 
   // 대괄호·라벨이 없는 카톡은 첫머리의 계약 문맥이 명확할 때만 후보화한다.
@@ -275,10 +351,10 @@ function extractClientName(text: string): { value: string | null; confidence: nu
     const match = text.match(pattern);
     const candidate = match?.[1]?.trim() ?? "";
     if (candidate && !nonClientLeadingWords.has(candidate)) {
-      return { value: candidate, confidence: 0.7 };
+      return { value: candidate, confidence: 0.7, span: spanOf(text, match!.index ?? 0, match![0].length) };
     }
   }
-  return { value: null, confidence: 0 };
+  return { value: null, confidence: 0, span: null };
 }
 
 /** 외부 AI 전송 전 마스킹에 사용할 로컬 거래처명 후보. 원문 밖의 이름은 만들지 않는다. */
@@ -301,16 +377,98 @@ export function parseContractDeterministically(text: string, options: ParseContr
   if (amount.value == null) missingFields.push("grossAmount");
   if (payerNet.needsResolution) missingFields.push("payerStatedNetAmountCandidate");
   if (!completion.value) missingFields.push("completionDate");
-  if (settlement.term === "UNKNOWN") missingFields.push("settlementTerm");
+  if (settlement.value === "UNKNOWN") missingFields.push("settlementTerm");
   if (incomeType.value === "needs_review") missingFields.push("incomeTypeCandidate");
 
+  // [#48] 근거 구간을 원문과 대조해 신뢰할 수 없는 값의 confidence를 내린다.
+  // 값은 바꾸지 않는다 — 확인 모달이 사용자에게 어디를 보라고 알려주는 것이 목적이다.
+  //
+  // round-trip은 "근거 구간만 다시 읽어도 같은 값이 나오는가"다. 여기서 재파싱은
+  // 같은 추출 함수를 그대로 재사용한다. 규칙을 두 벌로 만들면 자기 검증이 검증하려는
+  // 대상과 어긋난다.
+  const verified = [
+    verifyField(
+      {
+        field: "clientName",
+        value: client.value,
+        confidence: client.confidence,
+        span: client.span,
+        roundTripOk: checkRoundTrip(client.span, client.value, (part) => extractClientName(part).value),
+      },
+      normalized,
+    ),
+    verifyField(
+      {
+        field: "grossAmount",
+        value: amount.value,
+        confidence: amount.confidence,
+        span: amount.span,
+        roundTripOk: checkRoundTrip(amount.span, amount.value, (part) => extractAmount(part, []).value),
+      },
+      normalized,
+    ),
+    verifyField(
+      {
+        field: "payerStatedNetAmountCandidate",
+        value: payerNet.value,
+        confidence: payerNet.confidence,
+        span: payerNet.span,
+        // 공제액 경로는 총액과 함께 계산한 값이라 구간만으로는 재현되지 않는다.
+        roundTripOk: checkRoundTrip(payerNet.span, payerNet.value, (part) =>
+          extractPayerStatedNetAmount(part, amount.value, []).value,
+        ),
+      },
+      normalized,
+    ),
+    verifyField(
+      {
+        field: "completionDate",
+        value: completion.value,
+        confidence: completion.confidence,
+        span: completion.span,
+        roundTripOk: checkRoundTrip(completion.span, completion.value, (part) =>
+          extractCompletionDate(part, options.referenceDate).value,
+        ),
+      },
+      normalized,
+    ),
+    verifyField(
+      {
+        field: "settlementTerm",
+        value: settlement.value,
+        confidence: settlement.confidence,
+        span: settlement.span,
+        roundTripOk: checkRoundTrip(settlement.span, settlement.value, (part) => extractSettlement(part).value),
+      },
+      normalized,
+    ),
+    verifyField(
+      {
+        field: "incomeTypeCandidate",
+        value: incomeType.value,
+        confidence: incomeType.confidence,
+        span: incomeType.span,
+        roundTripOk: checkRoundTrip(incomeType.span, incomeType.value, (part) => extractIncomeType(part).value),
+      },
+      normalized,
+    ),
+  ];
+
+  const evidence = verified.map((entry) => entry.evidence);
+  const byField = (field: EvidenceField): number =>
+    verified.find((entry) => entry.evidence.field === field)!.confidence;
+
+  for (const entry of evidence) {
+    if (entry.demotedReason) warnings.push(entry.demotedReason);
+  }
+
   const confidence = {
-    clientName: client.confidence,
-    grossAmount: amount.confidence,
-    payerStatedNetAmountCandidate: payerNet.confidence,
-    completionDate: completion.confidence,
-    settlementTerm: settlement.confidence,
-    incomeTypeCandidate: incomeType.confidence,
+    clientName: byField("clientName"),
+    grossAmount: byField("grossAmount"),
+    payerStatedNetAmountCandidate: byField("payerStatedNetAmountCandidate"),
+    completionDate: byField("completionDate"),
+    settlementTerm: byField("settlementTerm"),
+    incomeTypeCandidate: byField("incomeTypeCandidate"),
   };
   const hasLowConfidence = Object.values(confidence).some((value) => value < CONFIDENCE_THRESHOLD.normal);
   const needsReview = missingFields.length > 0 || warnings.length > 0 || hasLowConfidence;
@@ -318,12 +476,14 @@ export function parseContractDeterministically(text: string, options: ParseContr
   return {
     source: "deterministic_fallback",
     warnings,
+    evidence,
+    normalizedText: normalized,
     candidate: {
       clientName: client.value,
       grossAmount: amount.value,
       payerStatedNetAmountCandidate: payerNet.value,
       completionDate: completion.value,
-      settlementTerm: settlement.term,
+      settlementTerm: settlement.value,
       settlementDay: settlement.day,
       incomeTypeCandidate: incomeType.value,
       confidence,
