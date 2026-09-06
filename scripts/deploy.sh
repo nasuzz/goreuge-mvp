@@ -151,10 +151,21 @@ run_check() {
 
 run_prod() {
   echo "== Vercel production 배포 (저장소 루트에서 실행) =="
-  command -v vercel >/dev/null 2>&1 || {
-    echo "오류: vercel CLI가 필요합니다 (예: npx vercel, 또는 npm i -g vercel)" >&2
+
+  # [PR #44 리뷰 반영, lyoonji] vercel을 전역 설치하지 않고 npx로만 쓰는
+  # 환경이 있다(실측: 전역 command -v vercel은 실패, npx vercel --version은
+  # 정상). 안내 문구도 "npx vercel"을 권했으면서 정작 스크립트는 못 쓰는
+  # 모순이 있었다 — 실행기를 한 번만 정해서 이후 두 호출(env ls, --prod)
+  # 모두 같은 걸 쓰게 한다.
+  local -a VERCEL
+  if command -v vercel >/dev/null 2>&1; then
+    VERCEL=(vercel)
+  elif command -v npx >/dev/null 2>&1; then
+    VERCEL=(npx --yes vercel)
+  else
+    echo "오류: vercel CLI가 필요합니다 (npm i -g vercel, 또는 npx 사용)" >&2
     exit 1
-  }
+  fi
 
   # [PR #44 리뷰 반영, lyoonji — P0] `vercel` CLI는 현재 디렉터리를 그대로
   # 업로드한다. web/에서 실행하면 web/만 올라가는데, 이 앱은 tsconfig의
@@ -165,7 +176,7 @@ run_prod() {
   # 반드시 저장소 루트에서 실행해야 Vercel 프로젝트의 "Root Directory: web"
   # 설정과 맞물린다.
   echo "-- 필수 환경변수 존재 확인 (DEMO_USER_ID) --"
-  if ! (vercel env ls production 2>/dev/null | grep -q "DEMO_USER_ID"); then
+  if ! ("${VERCEL[@]}" env ls production 2>/dev/null | grep -q "DEMO_USER_ID"); then
     echo "경고: Vercel production 환경변수 목록에서 DEMO_USER_ID를 확인하지 못했습니다." >&2
     echo "  미설정 시 데모 화면이 빈 계정으로 뜰 수 있습니다 (docs/release.md 1-2절 참고)." >&2
     if [ -t 0 ]; then
@@ -180,10 +191,12 @@ run_prod() {
   fi
 
   local deploy_output
-  deploy_output="$(vercel --prod --yes)"
+  deploy_output="$("${VERCEL[@]}" --prod --yes)"
   echo "$deploy_output"
   # vercel CLI는 성공 시 마지막 줄에 배포 URL만 출력한다.
-  API_BASE="$(echo "$deploy_output" | tail -1)"
+  # [PR #44 리뷰 반영, lyoonji] Windows Git Bash에서 CLI 출력에 \r이 섞이면
+  # API_BASE가 "https://...\r"가 되어 이후 smoke 요청이 깨질 수 있어 제거한다.
+  API_BASE="$(echo "$deploy_output" | tail -1 | tr -d '\r')"
   echo "배포 완료: $API_BASE"
 }
 
