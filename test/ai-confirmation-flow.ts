@@ -133,6 +133,44 @@ for (const [label, patch, canSave] of dayCases) {
   }
 }
 
+// ── 지급처 안내 금액을 못 읽었을 때의 confidence (이슈 #41) ──────
+// 값이 null이라고 무조건 "원문에 안내가 없다"고 확신하면 안 된다. 못 읽은
+// 경우까지 confidence 1.0으로 통과시키면 확인 모달이 초록색 "확신도 100%"로
+// 그려서 사용자가 그냥 넘어가고, 지급처가 알려준 금액 대신 참조율 추정치가 쓰인다.
+const payerConfidenceCases: [string, string, number | null, number][] = [
+  ["숫자 표기는 그대로 추출", "실수령액은 967,000원입니다", 967000, 0.98],
+  ["한글 수사도 그대로 추출", "실수령액은 구십육만원입니다", 960000, 0.98],
+  ["공제액 안내는 계산값", "공제액 33,000원 제외합니다", 967000, 0.92],
+  ["혼합 표기는 못 읽지만 confidence를 낮춘다", "실수령액은 96만 7천원입니다", null, 0.3],
+  ["띄어쓰기 없는 혼합 표기도 동일", "실수령액은 96만7천원입니다", null, 0.3],
+  ["원문에 안내가 없으면 1.0 유지", "", null, 1],
+  ["공제율만 있으면 1.0 유지", "3.3% 공제 후 지급합니다", null, 1],
+];
+for (const [label, clause, expectedValue, expectedConfidence] of payerConfidenceCases) {
+  const sentence = `[D에이전시] 총 100만원. ${clause} 완료 2026년 9월 3일, 익월 말일.`;
+  const result = parseContractDeterministically(sentence, { referenceDate: "2026-09-01" });
+  const actualValue = result.candidate.payerStatedNetAmountCandidate;
+  const actualConfidence = result.candidate.confidence.payerStatedNetAmountCandidate;
+  if (actualValue !== expectedValue || actualConfidence !== expectedConfidence) {
+    failures.push(
+      `${label}: 값=${actualValue}(기대 ${expectedValue}) confidence=${actualConfidence}(기대 ${expectedConfidence})`,
+    );
+  }
+}
+// 낮춘 confidence가 확인 모달에서 실제로 "직접 확인" 톤이 되는지까지 확인한다.
+const unreadable = parseContractDeterministically(
+  "[D에이전시] 총 100만원. 실수령액은 96만 7천원입니다. 완료 2026년 9월 3일, 익월 말일.",
+  { referenceDate: "2026-09-01" },
+);
+const unreadableView = buildAIConfirmationViewModel({ ...unreadable, fallbackReason: null });
+const payerField = unreadableView.fields.find((f) => f.field === "payerStatedNetAmountCandidate");
+if (payerField?.tone !== "danger") {
+  failures.push(`못 읽은 지급처 안내 금액은 danger 톤이어야 합니다 (실제 ${payerField?.tone}).`);
+}
+if (!unreadable.warnings.some((w) => w.includes("정확히 읽지 못했습니다"))) {
+  failures.push("못 읽은 경우 사용자에게 보여줄 경고가 있어야 합니다.");
+}
+
 const validRequest = parseContractParseRequest({ text: `  ${text}  `, referenceDate: "2026-09-04" });
 if (!validRequest.ok || validRequest.value.text !== text) failures.push("정상 API 요청을 trim 후 통과시켜야 합니다.");
 if (parseContractParseRequest({ text: "", referenceDate: "2026-09-04" }).ok) failures.push("빈 원문을 차단해야 합니다.");
