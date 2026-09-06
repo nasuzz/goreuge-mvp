@@ -12,9 +12,12 @@ import { useCallback, useSyncExternalStore } from "react";
 import {
   calculateExpectedDate,
   calculateExpectedNetAmount,
+  applySavingsCheck,
   cancelContract,
   compareWhatIf,
+  confirmPayment,
   markContractAsRisk,
+  recalculateClientStats,
   recalculateContractStatuses,
   revertManualStatus,
   runAllScenarios,
@@ -27,6 +30,7 @@ import type {
   Client,
   Contract,
   ContractCreateInput,
+  DateString,
   EngineInput,
   WhatIfAssumption,
   WhatIfResult,
@@ -224,6 +228,63 @@ export function revert(contractId: string) {
   applyToContract(contractId, (c) => revertManualStatus(c, "waiting", NOW));
 }
 
+/**
+ * 입금 확인 (engine-interface.md 3-9, 이슈 #55).
+ *
+ * 계약을 완료로 확정하고 공제율을 역산한 뒤, 그 거래처의 지연 통계를 다시 계산한다(3-10).
+ * 통계는 D-day 시나리오가 쓰는 입금일 추정 근거라, 같이 갱신하지 않으면 방금 확인한
+ * 입금이 다음 계산에 반영되지 않는다.
+ */
+export function confirmContractPayment(
+  contractId: string,
+  actualDate: DateString,
+  actualNetAmount: number,
+) {
+  const contracts = snapshot.input.contracts.map((c) =>
+    c.id === contractId
+      ? confirmPayment(c, { contractId, actualDate, actualNetAmount }, NOW)
+      : c,
+  );
+  const target = contracts.find((c) => c.id === contractId);
+  // recalculateClientStats는 넘긴 배열을 "이 거래처의 완료 계약"으로 그대로 센다.
+  // clientId를 스스로 거르지 않으므로 호출부가 걸러 넘겨야 completedCount가 맞는다.
+  const clients = target
+    ? snapshot.input.clients.map((cl) =>
+        cl.id === target.clientId
+          ? recalculateClientStats(
+              cl,
+              contracts.filter((c) => c.clientId === cl.id && c.actualDate !== null),
+            )
+          : cl,
+      )
+    : snapshot.input.clients;
+
+  commit({ ...snapshot.input, contracts, clients }, snapshot.onboarded);
+}
+
+/**
+ * 적립 체크 (engine-interface.md 3-11, 이슈 #56).
+ *
+ * 앱은 계좌이체를 실행하지 않는다. 사용자가 "옮겼다"고 체크한 사실만 기록하고,
+ * 그 금액이 reservedAmount로 넘어가면서 simulationStartBalance에서 빠진다.
+ * 그래서 체크 즉시 D-day가 실제로 앞당겨진다 — 이게 3-11이 말한 "정적 목업이 아니라
+ * 실제로 동작하는 화면"의 핵심이다.
+ */
+export function checkSaving(savingId: string, amount: number) {
+  const savings = snapshot.input.savings.map((s) =>
+    s.id === savingId
+      ? applySavingsCheck(s, {
+          id: "check-local-" + Date.now(),
+          savingId,
+          checkedAt: NOW,
+          amount,
+          transferConfirmed: true,
+        })
+      : s,
+  );
+  commit({ ...snapshot.input, savings }, snapshot.onboarded);
+}
+
 export function runWhatIf(assumptions: WhatIfAssumption[]): WhatIfResult[] {
   return compareWhatIf(snapshot.input, assumptions, NOW);
 }
@@ -249,6 +310,8 @@ export function useMockStore() {
     markRisk,
     cancel,
     revert,
+    confirmContractPayment,
+    checkSaving,
     runWhatIf,
     reset,
   };
