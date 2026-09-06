@@ -158,6 +158,8 @@ export interface SavingsCheck {
 export interface AIContractCandidate {
   clientName: string | null;
   grossAmount: Won | null;
+  /** 지급처가 원문에서 안내한 실수령액 후보. 공제율만으로 임의 생성하지 않는다. */
+  payerStatedNetAmountCandidate: Won | null;
   completionDate: DateString | null;
   settlementTerm: SettlementTerm | null;
   settlementDay: number | null;
@@ -167,6 +169,7 @@ export interface AIContractCandidate {
   confidence: {
     clientName: number;
     grossAmount: number;
+    payerStatedNetAmountCandidate: number;
     completionDate: number;
     settlementTerm: number;
     incomeTypeCandidate: number;
