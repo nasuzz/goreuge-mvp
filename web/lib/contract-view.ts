@@ -51,9 +51,12 @@ export function netAmountView(contract: Contract): NetAmountView {
     };
   }
 
-  const percent = contract.confirmedExpectedRate
-    ? (contract.confirmedExpectedRate * 100).toFixed(1).replace(/\.0$/, "")
-    : null;
+  // 0%(no_withholding)도 "참조율 없음"이 아니라 "0% 적용"이다. truthy로 검사하면
+  // rate가 0일 때 null 가지로 빠져서 등록 화면과 정산함 카드의 문구가 갈린다.
+  const percent =
+    contract.confirmedExpectedRate !== null
+      ? (contract.confirmedExpectedRate * 100).toFixed(1).replace(/\.0$/, "")
+      : null;
 
   return {
     amount: result.amount,
