@@ -245,6 +245,32 @@ async function main() {
     );
   }
 
+  // ── 6. GET /api/recovery ─────────────────────────────────
+  // [PR #81] 협상 카드는 화면이 mock store 경로로만 동작해서 이 라우트를 호출하지
+  // 않는다. 스모크에 넣지 않으면 실 API로 전환할 때 검증 없이 처음 실행되는 코드가
+  // 된다. 값 자체는 findRecovery의 회귀 테스트가 보므로 여기서는 라우트가 실제 DB로
+  // 응답하는지와 구조만 본다.
+  section(6, "GET /api/recovery — 협상 카드");
+  const recovery = await call("GET", `/api/recovery?userId=${DEMO_USER_ID}`);
+  check("조회 200", recovery.status, 200);
+  check("options 배열 반환", Array.isArray(recovery.body?.options), true);
+  for (const option of recovery.body?.options ?? []) {
+    // 화면이 그대로 그리는 값들이라 하나라도 비면 카드가 깨진다.
+    check(
+      `${option.assumption?.label}: 화면이 쓰는 필드가 모두 있다`,
+      {
+        type: typeof option.assumption?.type,
+        delta: typeof option.dayDelta,
+        before: typeof option.dDayBefore,
+        rationale: Array.isArray(option.rationale),
+      },
+      { type: "string", delta: "number", before: "string", rationale: true },
+    );
+  }
+  if ((recovery.body?.options ?? []).length === 0) {
+    note("대응안 0건", recovery.body?.emptyReason ?? "(사유 없음)");
+  }
+
   // ── 결과 ─────────────────────────────────────────────────
   console.log("\n" + "=".repeat(60));
   console.log(failures === 0 ? "전부 통과 (실패 0건)" : `${failures}건 실패`);
