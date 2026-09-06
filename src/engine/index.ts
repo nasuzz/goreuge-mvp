@@ -11,7 +11,11 @@ export {
   markContractAsRisk,
   cancelContract,
   revertManualStatus,
+  confirmPayment,
 } from "./statusTransition";
+// [이슈 #55 추가]
+export { recalculateClientStats } from "./clientStats";
+export type { PaymentConfirmInput } from "../shared/types";
 export { compareWhatIf, formatWhatIfMessage, splitDelayedMonthlyOutflow } from "./whatIf";
 // WhatIfAssumption/WhatIfResult는 shared/types.ts가 원본이다 (whatIf.ts는 재정의하지 않음).
 export type { WhatIfAssumption, WhatIfResult } from "../shared/types";
