@@ -382,6 +382,7 @@
       "status": "waiting"
     },
     {
+      "_case": "[PR #64 리뷰 확인, lyoonji] weeklyAmount 50,000원은 이번 주 가용금액(15,100원) x 0.30(4,530원)보다 커서 calculateWishPlan.exceedsWeeklyWarning이 항상 true다. 계산은 규격 그대로 정확하고, 화면 첫 진입부터 경고가 뜨는 건 실수가 아니라 의도된 데모 포인트로 두기로 함 — '가용금액에 비해 무리한 적립을 앱이 잡아준다'. 경고 없는 기본값을 원하면 weeklyAmount를 4,530원 이하로 낮출 것.",
       "id": "saving-002",
       "kind": "wish",
       "name": "모니터 교체",

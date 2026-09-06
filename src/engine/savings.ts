@@ -55,6 +55,13 @@ export function calculateWishPlan(
 // DB 트리거(chk_reserved_not_exceeds_checks)가 reservedAmount > 체크이력 합계를
 // 막으므로, 여기서도 같은 취지로 "이번 체크가 plannedAmount 잔액을 넘지 않는지"를
 // 먼저 검증한다 — 서버 왕복 없이 화면에서 바로 실패를 알 수 있어야 하기 때문(3-11).
+//
+// [PR #64 리뷰 반영, lyoonji] 이 함수는 saving.status(SavingsStatus)를 의도적으로
+// 건드리지 않는다 — engine-interface.md 3-11의 "적립 상태 전이"는 금액 필드 얘기이고,
+// status enum의 전이 규칙은 어디에도 정의돼 있지 않다. 화면은 status가 아니라
+// reservedAmount/plannedAmount 값으로 적립 중/완료 여부를 판단해야 한다.
+// "구매 완료"(reservedAmount 감소·spentAmount 증가) 전이는 이 이슈(#56) 범위 밖이라
+// 별도 함수로 두지 않았다 — 필요해지면 후속 이슈로 뺀다.
 export function applySavingsCheck(saving: Saving, check: SavingsCheck): Saving {
   if (check.savingId !== saving.id) {
     throw new Error(
