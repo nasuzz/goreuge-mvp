@@ -18,5 +18,9 @@ export type { WhatIfAssumption, WhatIfResult } from "../shared/types";
 
 // [이슈 #14 추가]
 export { calculateExpectedDate } from "./expectedDate";
+export type { CalculateExpectedDateOptions } from "./expectedDate";
 export { calculateExpectedNetAmount } from "./expectedNetAmount";
 export type { ExpectedNetAmountResult } from "./expectedNetAmount";
+
+// [이슈 #57 추가] 주말·공휴일 보정 (기본 OFF, adjustWeekendHoliday 옵션으로 켠다)
+export { isHoliday, KR_HOLIDAYS_CACHE } from "../shared/holidays";

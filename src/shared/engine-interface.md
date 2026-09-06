@@ -8,7 +8,7 @@
 | 대상 | 용도 | 담당 |
 | --- | --- | --- |
 | LLM API | 계약 문장 → 구조화 JSON | **B** |
-| 공휴일 API | 예정입금일 주말·공휴일 보정 | A — **P1, MVP는 OFF** |
+| 공휴일 API | 예정입금일 주말·공휴일 보정 | A — **P1, MVP는 OFF** (사전 캐시 데이터로 대체, 이슈 #57) |
 
 그 외 외부 API는 없다. **A가 만드는 건 전부 우리 코드 안의 순수 계산 함수다.**
 
@@ -96,10 +96,15 @@ function calculateExpectedDate(
 `expectedDateSource: "manual"`이라는 탈출구가 있어서 6개로 충분하다.
 이 필드가 없으면 `UNKNOWN` 계약이 영원히 D-day에 못 들어간다.
 
-**주말·공휴일 보정 (P1, 기본 OFF)**
+**주말·공휴일 보정 (P1, 기본 OFF) — 이슈 #57에서 구현, 기본값은 여전히 OFF**
 예정입금일이 토·일·공휴일이면 **다음 영업일**로 이동 (돈이 늦게 들어온다고 보는 쪽이 보수적).
 > 데모 계약이 실제로 걸린다: 완료일 2026-09-03 + 익월 말일 = **2026-10-31 (토)**.
 > MVP는 OFF라 10/31 그대로 쓴다. 켜면 11/2(월).
+
+`calculateExpectedDate(contract, { adjustWeekendHoliday: true })`로 옵션을 켤 수 있다.
+기본값(`adjustWeekendHoliday` 생략 또는 `false`)은 기존과 동일하게 계산된 날짜를 그대로 반환한다.
+공휴일 판정은 `shared/holidays.ts`의 사전 캐시(`KR_HOLIDAYS_CACHE`)를 쓴다 — 실제 공휴일 API 연동 전까지의 대체 데이터다.
+ON일 때의 기대값은 `test/expected-holiday-verify.ts`에 별도로 고정돼 있고, `test/expected-verify.ts`의 기존 OFF 기준 검증값은 그대로 통과한다.
 
 ---
 
