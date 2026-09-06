@@ -194,7 +194,6 @@ export default function HomePage() {
     </main>
   );
 }
-
 function ScenarioCell({
   label,
   result,
@@ -236,4 +235,3 @@ function ScenarioCell({
     </li>
   );
 }
-
