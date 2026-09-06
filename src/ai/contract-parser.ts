@@ -217,7 +217,7 @@ function extractIncomeType(text: string): { value: IncomeType; confidence: numbe
 
 function extractClientName(text: string): { value: string | null; confidence: number } {
   const explicitPatterns = [
-    /(?:거래처|클라이언트|발신|From)\s*[:：]\s*([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._ -]{1,24})/i,
+    /(?:거래처|클라이언트|발신|From)\s*[:：]\s*([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._-]{1,24})/i,
     /^\s*\[([가-힣A-Za-z0-9][가-힣A-Za-z0-9&._ -]{1,24})\]/,
   ];
   for (const pattern of explicitPatterns) {

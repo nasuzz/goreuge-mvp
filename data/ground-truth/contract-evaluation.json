@@ -14,8 +14,8 @@
     {
       "id": "eval-02",
       "channel": "email",
-      "text": "[스튜디오봄] 완료일은 2026년 9월 10일, 계약 금액은 2,400,000원입니다. 완료 후 30일 지급하고 원천징수 없이 입금합니다.",
-      "tags": ["comma_amount", "net_days", "no_withholding"],
+      "text": "거래처: 스튜디오봄 완료일은 2026년 9월 10일, 계약 금액은 2,400,000원입니다. 완료 후 30일 지급하고 원천징수 없이 입금합니다.",
+      "tags": ["comma_amount", "net_days", "no_withholding", "labeled_client_colon"],
       "expected": { "clientName": "스튜디오봄", "grossAmount": 2400000, "payerStatedNetAmountCandidate": null, "completionDate": "2026-09-10", "settlementTerm": "NET_DAYS", "settlementDay": 30, "incomeTypeCandidate": "no_withholding", "needsReview": false }
     },
     {
@@ -98,8 +98,8 @@
     {
       "id": "eval-14",
       "channel": "email",
-      "text": "[NovaLab] 납품 예정일은 2026년 10월 2일이며 계약 금액은 3,200,000원입니다. 청구 후 45일, 원천징수 없이 지급합니다.",
-      "tags": ["net_45", "english_client"],
+      "text": "From: NovaLab 납품 예정일은 2026년 10월 2일이며 계약 금액은 3,200,000원입니다. 청구 후 45일, 원천징수 없이 지급합니다.",
+      "tags": ["net_45", "english_client", "labeled_client_colon"],
       "expected": { "clientName": "NovaLab", "grossAmount": 3200000, "payerStatedNetAmountCandidate": null, "completionDate": "2026-10-02", "settlementTerm": "NET_DAYS", "settlementDay": 45, "incomeTypeCandidate": "no_withholding", "needsReview": false }
     },
     {
@@ -140,8 +140,8 @@
     {
       "id": "eval-20",
       "channel": "email",
-      "text": "[루프앤코] 완료일: 2026.09.27 / 계약 금액: 2,750,000원 / 익월 20일 / 인적용역 사업소득입니다.",
-      "tags": ["dot_date", "structured_text"],
+      "text": "클라이언트: 루프앤코 완료일: 2026.09.27 / 계약 금액: 2,750,000원 / 익월 20일 / 인적용역 사업소득입니다.",
+      "tags": ["dot_date", "structured_text", "labeled_client_colon"],
       "expected": { "clientName": "루프앤코", "grossAmount": 2750000, "payerStatedNetAmountCandidate": null, "completionDate": "2026-09-27", "settlementTerm": "NEXT_MONTH_DAY", "settlementDay": 20, "incomeTypeCandidate": "business_personal_service", "needsReview": false }
     }
   ]
