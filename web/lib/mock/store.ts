@@ -16,6 +16,7 @@ import {
   cancelContract,
   compareWhatIf,
   confirmPayment,
+  findRecovery,
   markContractAsRisk,
   recalculateClientStats,
   recalculateContractStatuses,
@@ -35,6 +36,7 @@ import type {
   WhatIfAssumption,
   WhatIfResult,
 } from "@/shared/types";
+import type { RecoveryFinding } from "@/engine/index";
 
 /** 데모 기준일은 shared-spec D11에 따라 2026-09-01로 고정한다. */
 const NOW = TODAY + "T09:00:00+09:00";
@@ -50,6 +52,7 @@ export interface OnboardingInput {
 export interface StoreSnapshot {
   input: EngineInput;
   summary: CashflowSummary;
+  recovery: RecoveryFinding;
   today: string;
   onboarded: boolean;
 }
@@ -63,6 +66,7 @@ function build(input: EngineInput, onboarded: boolean): StoreSnapshot {
   return {
     input: settled,
     summary: runAllScenarios(settled),
+    recovery: findRecovery(settled, NOW),
     today: TODAY,
     onboarded,
   };

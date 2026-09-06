@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { addDays } from "@/engine/index";
 import { Badge, Card, EmptyState, Row, toneOfLevel } from "@/components/ui";
+import { RecoveryCards } from "@/components/recovery-cards";
 import { WhatIfPanel } from "@/components/what-if-panel";
 import { ddayLabel, dateLabel, longDateLabel, signedDays, won } from "@/lib/format";
 import { useMockStore } from "@/lib/mock/store";
 import type { CashflowResult } from "@/shared/types";
 
 export default function HomePage() {
-  const { summary, input, today, onboarded } = useMockStore();
+  const { summary, recovery, input, today, onboarded } = useMockStore();
   const { baseline, optimistic, pessimistic, weekly, balanceBreakdown, riskCause } = summary;
 
   // 오늘의 예상잔액 등급. 캘린더 배경색과 같은 기준(엔진의 level)을 쓴다.
@@ -176,6 +177,8 @@ export default function HomePage() {
           )}
         </div>
       </Card>
+
+      <RecoveryCards finding={recovery} />
 
       <WhatIfPanel />
 
