@@ -12,6 +12,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import {
   calculateExpectedDate,
   calculateExpectedNetAmount,
+  applySavingsCheck,
   cancelContract,
   compareWhatIf,
   confirmPayment,
@@ -261,6 +262,29 @@ export function confirmContractPayment(
   commit({ ...snapshot.input, contracts, clients }, snapshot.onboarded);
 }
 
+/**
+ * 적립 체크 (engine-interface.md 3-11, 이슈 #56).
+ *
+ * 앱은 계좌이체를 실행하지 않는다. 사용자가 "옮겼다"고 체크한 사실만 기록하고,
+ * 그 금액이 reservedAmount로 넘어가면서 simulationStartBalance에서 빠진다.
+ * 그래서 체크 즉시 D-day가 실제로 앞당겨진다 — 이게 3-11이 말한 "정적 목업이 아니라
+ * 실제로 동작하는 화면"의 핵심이다.
+ */
+export function checkSaving(savingId: string, amount: number) {
+  const savings = snapshot.input.savings.map((s) =>
+    s.id === savingId
+      ? applySavingsCheck(s, {
+          id: "check-local-" + Date.now(),
+          savingId,
+          checkedAt: NOW,
+          amount,
+          transferConfirmed: true,
+        })
+      : s,
+  );
+  commit({ ...snapshot.input, savings }, snapshot.onboarded);
+}
+
 export function runWhatIf(assumptions: WhatIfAssumption[]): WhatIfResult[] {
   return compareWhatIf(snapshot.input, assumptions, NOW);
 }
@@ -287,6 +311,7 @@ export function useMockStore() {
     cancel,
     revert,
     confirmContractPayment,
+    checkSaving,
     runWhatIf,
     reset,
   };
