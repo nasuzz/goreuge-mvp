@@ -149,7 +149,10 @@ export function runScenario(input: EngineInput, scenario: Scenario): CashflowRes
 
     const inflow = inflowByDate[date] ?? 0;
     const fixedOutflow = outflowByDate[date] ?? 0;
-    const newSavingsOutflow = 0; // P1 대상. P0에서는 항상 0 (plannedAmount 반영은 P1).
+    // [이슈 #68, 2026-09-07 확정] plannedAmount를 여기서 반영하려 했으나
+    // Saving에 그 "예정일"을 담을 필드가 없어 보류로 확정했다(engine-interface.md
+    // 3-11 참고). 계속 0으로 둔다 — plannedAmount는 화면 표시 전용이다.
+    const newSavingsOutflow = 0;
 
     runningBalance = runningBalance + inflow - fixedOutflow - dailyBaselineRaw - newSavingsOutflow;
     const closingBalance = round.display(runningBalance);

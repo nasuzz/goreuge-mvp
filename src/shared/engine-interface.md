@@ -418,11 +418,28 @@ function applySavingsCheck(
 ```
 
 **A가 P1에서 추가로 할 일**
-1. `simulationStartBalance`에 `reservedAmount` 실제 반영 (공식은 이미 있음)
-2. `plannedAmount`를 예정일의 미래 유출로 반영 (이중 차감 금지)
-3. `calculateWishPlan` 구현
+1. `simulationStartBalance`에 `reservedAmount` 실제 반영 (공식은 이미 있음) — PR #65 구현 완료
+2. ~~`plannedAmount`를 예정일의 미래 유출로 반영 (이중 차감 금지)~~ — **보류 확정, 이슈 #68 참고**
+3. `calculateWishPlan` 구현 — PR #65 구현 완료
 4. `applySavingsCheck` — DB 트리거가 `reservedAmount > 체크이력 합계`를 막으므로
-   엔진에서도 같은 검증을 먼저 한다
+   엔진에서도 같은 검증을 먼저 한다 — PR #65 구현 완료
+
+> **[2026-09-07 결정, 이슈 #68]** 2번은 구현하지 않는다. "예정일의 미래
+> 유출"을 계산하려면 그 예정일을 담을 필드가 필요한데, `Saving` 타입에도
+> `savings` 테이블에도 날짜 컬럼이 없다(PR #65 구현 중 발견 — 규격 문구와
+> 실제 데이터 모델이 애초에 안 맞았다). 검토한 선택지:
+>
+> 1. `Saving.plannedDate: DateString | null` 신설 — 규격과 가장 가깝지만
+>    공용 타입·DB 컬럼·매퍼·mock 데이터가 함께 바뀌어야 한다.
+> 2. `weeklyAmount` 주기에서 유도 — 타입 변경은 없지만 "한 번만 반영"이라는
+>    규격 문구와 어긋난다(반복 유출이 되어버린다).
+> 3. **현행 유지** — `plannedAmount`는 화면 표시 전용으로 두고 D-day에는
+>    `reservedAmount`만 반영한다.
+>
+> **3번으로 확정한다.** 1번의 위험(공용 타입 변경, 마감 임박)이 얻는 값보다
+> 크고, 데모 클라이맥스(세금 준비금 288,000원 체크 → 7일 앞당겨짐)는
+> `reservedAmount`만으로 이미 완전히 동작해 이 결정이 데모에 영향을 주지
+> 않는다(C 확인 완료).
 
 **C가 P1에서 추가로 할 일**
 위시함 화면을 정적 목업이 아니라 **체크하면 실제로 D-day가 바뀌는** 화면으로 만든다.
