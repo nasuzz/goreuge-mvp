@@ -16,6 +16,9 @@ export { compareWhatIf, formatWhatIfMessage, splitDelayedMonthlyOutflow } from "
 // WhatIfAssumption/WhatIfResult는 shared/types.ts가 원본이다 (whatIf.ts는 재정의하지 않음).
 export type { WhatIfAssumption, WhatIfResult } from "../shared/types";
 
+// [이슈 #56 추가] engine-interface.md 3-11 (P1)
+export { calculateWishPlan, applySavingsCheck } from "./savings";
+
 // [이슈 #14 추가]
 export { calculateExpectedDate } from "./expectedDate";
 export { calculateExpectedNetAmount } from "./expectedNetAmount";

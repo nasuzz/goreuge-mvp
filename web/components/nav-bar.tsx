@@ -8,6 +8,9 @@ const MENU = [
   { href: "/", label: "홈", hint: "위클리" },
   { href: "/calendar", label: "캘린더", hint: "먼슬리" },
   { href: "/settlements", label: "정산함", hint: "계약" },
+  // [이슈 #56] 기획서 2장의 4번째 메뉴. P1이지만 3-11이 "실제로 동작하게 만드는 걸
+  // 목표로 한다(화면만 만드는 건 P2)"고 정해 체크하면 D-day가 바뀌는 화면으로 만든다.
+  { href: "/wish", label: "위시함", hint: "적립" },
 ] as const;
 
 export function NavBar() {
