@@ -15,23 +15,32 @@ const NOW = "2026-09-01T09:00:00+09:00";
 const NOW_FAR_FUTURE = "2026-11-01T09:00:00+09:00";
 const NOW_YEAR_END = "2026-12-31T09:00:00+09:00";
 
-console.log("── compareWhatIf: mock-data.json의 whatIfExamples 3종 그대로 실행 ──");
-const results = compareWhatIf(MOCK_ENGINE_INPUT, MOCK.whatIfExamples as WhatIfAssumption[], NOW);
-for (const r of results) {
+console.log("── compareWhatIf: mock-data.json의 whatIfExamples 3종을, 격리 상태(위험 전환 전)에서 그대로 실행 ──");
+const isolatedResults = compareWhatIf(MOCK_ENGINE_INPUT, MOCK.whatIfExamples as WhatIfAssumption[], NOW);
+for (const r of isolatedResults) {
   console.log(`  [${r.assumption.type}] before=${r.dDayBefore} after=${r.dDayAfter} dayDelta=${r.dayDelta}`);
 }
 
-const advanceResult = results.find((r) => r.assumption.type === "advance_payment")!;
-check(
-  "advancePayment500k.after (EXPECTED.demoBeats 대조)",
-  advanceResult.dDayAfter,
-  EXPECTED.demoBeats.advancePayment500k.after,
-);
-check(
-  "advancePayment500k.daysDelta (EXPECTED.demoBeats.daysRecovered 대조)",
-  advanceResult.dayDelta,
-  (EXPECTED.demoBeats.advancePayment500k as any).daysRecovered,
-);
+console.log("── compareWhatIf: 실제 데모 순서(1:35 위험 전환 → 2:00 대응안)로 체이닝해서 실행 (#8) ──");
+{
+  // 1:35과 동일한 입력을 만든다 — contract-002를 위험으로 전환한 "이후" 상태.
+  const chainedInput = structuredClone(MOCK_ENGINE_INPUT);
+  const idx = chainedInput.contracts.findIndex((c) => c.id === "contract-002");
+  chainedInput.contracts[idx] = markContractAsRisk(chainedInput.contracts[idx], "60일 이상 지연 예상, 수동 위험 지정", NOW);
+
+  const chainedResults = compareWhatIf(chainedInput, MOCK.whatIfExamples as WhatIfAssumption[], NOW);
+  for (const r of chainedResults) {
+    console.log(`  [${r.assumption.type}] before=${r.dDayBefore} after=${r.dDayAfter} dayDelta=${r.dayDelta}`);
+  }
+
+  const advanceResult = chainedResults.find((r) => r.assumption.type === "advance_payment")!;
+  check("advancePayment1M.after (1:35 이후 이어서 적용, EXPECTED.demoBeats 대조)", advanceResult.dDayAfter, EXPECTED.demoBeats.advancePayment1M.after);
+  check("advancePayment1M.dayDelta", advanceResult.dayDelta, (EXPECTED.demoBeats.advancePayment1M as any).daysRecovered);
+
+  const delayResult = chainedResults.find((r) => r.assumption.type === "delay_outflow")!;
+  check("delayCardPayment2Weeks.after (1:35 이후 이어서 적용, EXPECTED.demoBeats 대조)", delayResult.dDayAfter, EXPECTED.demoBeats.delayCardPayment2Weeks.after);
+  check("delayCardPayment2Weeks.dayDelta", delayResult.dayDelta, (EXPECTED.demoBeats.delayCardPayment2Weeks as any).daysRecovered);
+}
 
 console.log("\n── 원본 input 불변 확인 (compareWhatIf 실행 후) ──");
 check("contracts.length 원본 유지", MOCK_ENGINE_INPUT.contracts.length, 7);
