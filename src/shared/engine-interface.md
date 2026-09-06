@@ -339,6 +339,45 @@ function compareWhatIf(
 
 ---
 
+### 3-8-1. 조합 가정 비교 [구현 완료, 이슈 #50 / PR #58]
+
+```ts
+interface CombinedWhatIfResult {
+  assumptions: WhatIfAssumption[];
+  dDayBefore: DateString | null;
+  dDayAfter: DateString | null;
+  dayDelta: number;
+}
+
+function compareWhatIfCombined(
+  input: EngineInput, assumptions: WhatIfAssumption[], now: DateTimeString,
+): CombinedWhatIfResult;
+```
+
+`compareWhatIf`는 가정마다 원본의 깨끗한 복사본에서 독립적으로 계산하기 때문에
+"여러 가정을 동시에 적용하면 며칠인가"를 낼 수 없다. D-day는 "잔액이 최초로
+0 이하가 되는 날"이라 두 조치의 `dayDelta`를 단순히 더할 수 없기 때문이다 —
+실측(이슈 #50):
+
+```
+선금 1,500,000원 단독 : 09-14 -> 10-08  (+24일)
+카드 결제 연기 단독    : 09-14 -> 09-20  (+6일)
+둘 다 적용            : 09-14 -> 10-08  (+24일, 30일이 아니다)
+```
+
+그래서 `compareWhatIfCombined`는 여러 가정을 **같은 복사본에 순차 적용**한
+뒤 한 번만 재시뮬레이션한다.
+
+반환 타입이 `WhatIfResult`가 아니라 별도 `CombinedWhatIfResult`인 이유:
+`WhatIfResult.assumption`은 단수라 조합을 담으면 "N개 중 하나"만 실려 사실과
+달라진다. 가정 목록(`assumptions: WhatIfAssumption[]`)을 그대로 싣는 편이
+정직하다(PR #58 리뷰에서 A가 동의함).
+
+최대 개수 제한(`MVP_POLICY.maxWhatIfAssumptions`)은 `compareWhatIf`와 동일하게
+적용된다.
+
+---
+
 ### 3-9. 입금 확인 & 공제율 역산 (P1) [구현 완료, 이슈 #55]
 
 ```ts
