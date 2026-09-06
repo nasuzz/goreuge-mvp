@@ -20,3 +20,6 @@ export type { WhatIfAssumption, WhatIfResult } from "../shared/types";
 export { calculateExpectedDate } from "./expectedDate";
 export { calculateExpectedNetAmount } from "./expectedNetAmount";
 export type { ExpectedNetAmountResult } from "./expectedNetAmount";
+
+// [이슈 #56 추가]
+export { calculateWishPlan, applySavingsCheck } from "./savings";
