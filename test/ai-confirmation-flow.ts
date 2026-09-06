@@ -83,6 +83,27 @@ const missingCases: [string, Partial<AIContractCandidate>, string | null, string
   ["소득유형 needs_review 선택도 누락", { incomeTypeCandidate: "needs_review" }, null, ["incomeTypeCandidate"]],
   ["정산조건 UNKNOWN 선택도 누락", { settlementTerm: "UNKNOWN" }, null, ["settlementTerm"]],
   ["UNKNOWN이어도 수기 예정일이 있으면 누락 아님", { settlementTerm: "UNKNOWN" }, "2026-10-31", []],
+  // [#19] 지급처 안내 실수령액은 "값 없음 = 누락"이 아니다. 원문에 안내가 아예
+  // 없으면 confidence 1.0으로 정상이고, 안내끼리 충돌해 계산이 불가능할 때만
+  // confidence 0으로 내려온다. 값만 보고 판정하면 둘을 구분하지 못한다.
+  [
+    "지급처 안내가 원문에 없으면 누락 아님",
+    { payerStatedNetAmountCandidate: null, confidence: { ...filled.confidence, payerStatedNetAmountCandidate: 1 } },
+    null,
+    [],
+  ],
+  [
+    "지급처 안내 금액이 충돌하면 누락",
+    { payerStatedNetAmountCandidate: null, confidence: { ...filled.confidence, payerStatedNetAmountCandidate: 0 } },
+    null,
+    ["payerStatedNetAmountCandidate"],
+  ],
+  [
+    "충돌이어도 사용자가 금액을 넣으면 해소",
+    { payerStatedNetAmountCandidate: 950000, confidence: { ...filled.confidence, payerStatedNetAmountCandidate: 0 } },
+    null,
+    [],
+  ],
 ];
 for (const [label, patch, manual, expected] of missingCases) {
   const actual = recomputeMissingFields({ ...filled, ...patch }, manual);
