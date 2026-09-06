@@ -68,5 +68,47 @@ check(
   null,
 );
 
+// ── [PR #63 리뷰 반영] 공휴일 캐시가 커버하지 않는 연도 ──────────
+//
+// 커버 밖에서 주말 보정만 돌면 "보정된 영업일"처럼 보이지만 공휴일이 조용히 빠진다.
+// 실제로 2027-02-28(일)이 2027-03-01(삼일절)로 이동해 공휴일을 예정입금일로 내놨었다.
+// 손대지 않는 쪽이 틀린 답을 확신 있게 주는 것보다 낫다.
+check(
+  "커버 밖 연도(2027)는 보정하지 않고 원래 날짜 유지",
+  calculateExpectedDate(
+    { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2027-01-15", invoiceDate: null },
+    { adjustWeekendHoliday: true },
+  ),
+  "2027-02-28",
+);
+check(
+  "공휴일이 1건만 든 연도(2028)도 커버로 치지 않는다",
+  calculateExpectedDate(
+    { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2028-02-15", invoiceDate: null },
+    { adjustWeekendHoliday: true },
+  ),
+  "2028-03-31",
+);
+check(
+  "커버 연도(2026)는 그대로 보정된다 — 회귀",
+  calculateExpectedDate(
+    { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2026-09-03", invoiceDate: null },
+    { adjustWeekendHoliday: true },
+  ),
+  "2026-11-02",
+);
+check(
+  "커버 연도를 넘겨주면 그 연도도 보정 대상이 된다",
+  calculateExpectedDate(
+    { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2027-01-15", invoiceDate: null },
+    {
+      adjustWeekendHoliday: true,
+      holidays: new Set(["2027-03-01"]),
+      coveredYears: new Set([2027]),
+    },
+  ),
+  "2027-03-02",
+);
+
 console.log("\n" + (failCount === 0 ? `✅ 전부 통과 (${failCount}건 실패)` : `❌ ${failCount}건 실패`));
 process.exit(failCount === 0 ? 0 : 1);
