@@ -212,7 +212,7 @@ export default function NewContractPage() {
   }
 
   return (
-    <main className="flex flex-col gap-4">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <PageTitle
         title="계약 등록"
         description="입력한 값으로 예정입금일과 예상 실수령액을 계산합니다."
@@ -237,7 +237,7 @@ export default function NewContractPage() {
             type="button"
             onClick={requestCandidate}
             disabled={aiLoading || !aiText.trim()}
-            className="rounded-xl bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-40"
+            className="rounded-lg bg-accent-strong px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40"
           >
             {aiLoading ? "분석 중…" : "AI로 초안 만들기"}
           </button>
@@ -246,7 +246,7 @@ export default function NewContractPage() {
           )}
         </div>
         {aiError && (
-          <p role="alert" className="mt-2 rounded-xl bg-danger-bg px-3 py-2.5 text-sm text-danger">
+          <p role="alert" className="mt-2 rounded-lg bg-danger-bg px-3 py-2.5 text-sm text-danger">
             {aiError}
           </p>
         )}
@@ -328,7 +328,7 @@ export default function NewContractPage() {
             </Field>
           )}
 
-          <div className="mt-1 rounded-xl bg-surface-muted px-3 py-2.5">
+          <div className="mt-1 rounded-lg bg-surface-muted px-3 py-2.5">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm text-muted">예정입금일</span>
               <span className="text-sm font-semibold">
@@ -384,7 +384,7 @@ export default function NewContractPage() {
             </select>
           </Field>
 
-          <div className="rounded-xl bg-surface-muted px-3 py-2.5 text-xs text-muted">
+          <div className="rounded-lg bg-surface-muted px-3 py-2.5 text-xs text-muted">
             {reference.referenceRate !== null ? (
               <>
                 <p>
@@ -430,7 +430,7 @@ export default function NewContractPage() {
             />
           </Field>
 
-          <div className="mt-1 rounded-xl bg-surface-muted px-3 py-2.5">
+          <div className="mt-1 rounded-lg bg-surface-muted px-3 py-2.5">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm text-muted">예상 실수령액</span>
               <span className="tnum text-sm font-semibold">
@@ -454,7 +454,7 @@ export default function NewContractPage() {
         </Card>
 
         {errors.length > 0 && (
-          <ul role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
+          <ul role="alert" className="rounded-lg bg-danger-bg px-4 py-3 text-sm text-danger">
             {errors.map((message) => (
               <li key={message}>{message}</li>
             ))}
@@ -464,13 +464,13 @@ export default function NewContractPage() {
         <div className="flex gap-2">
           <button
             type="submit"
-            className="flex-1 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background"
+            className="flex-1 rounded-lg bg-accent-strong px-4 py-3 text-sm font-semibold text-white"
           >
             저장하기
           </button>
           <Link
             href="/settlements"
-            className="rounded-xl border border-line px-4 py-3 text-sm text-muted"
+            className="rounded-lg border border-line px-4 py-3 text-sm text-muted"
           >
             취소
           </Link>

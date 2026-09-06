@@ -51,8 +51,10 @@ export function WhatIfPanel() {
           return (
             <li key={preset.label}>
               <label
-                className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-                  checked ? "border-accent bg-surface-muted" : "border-line"
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                  checked
+                    ? "border-white/80 bg-[linear-gradient(135deg,var(--accent-soft),var(--lavender-soft))] shadow-[inset_0_2px_0_rgba(255,255,255,0.86),0_12px_20px_rgba(255,85,173,0.13)]"
+                    : "border-white/70 bg-white/72 hover:bg-surface-raised"
                 }`}
               >
                 <input
@@ -71,7 +73,7 @@ export function WhatIfPanel() {
       <button
         type="button"
         onClick={simulate}
-        className="mt-3 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background"
+        className="mt-3 w-full rounded-lg bg-accent-strong px-4 py-3 text-sm font-semibold text-white"
       >
         가정해 보기
       </button>
@@ -82,7 +84,7 @@ export function WhatIfPanel() {
       {error && (
         <p
           role="alert"
-          className="mt-3 rounded-xl bg-danger-bg px-3 py-2.5 text-sm text-danger"
+          className="mt-3 rounded-lg bg-danger-bg px-3 py-2.5 text-sm text-danger"
         >
           {error}
         </p>
@@ -91,7 +93,10 @@ export function WhatIfPanel() {
       {results && results.length > 0 && (
         <ul className="mt-3 flex flex-col gap-2 border-t border-line pt-3">
           {results.map((result) => (
-            <li key={result.assumption.label} className="rounded-xl bg-surface-muted p-3">
+            <li
+              key={result.assumption.label}
+              className="rounded-2xl border border-white/70 bg-white/76 p-3 shadow-[0_10px_18px_rgba(54,125,255,0.1)]"
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-medium">{result.assumption.label}</span>
                 <span

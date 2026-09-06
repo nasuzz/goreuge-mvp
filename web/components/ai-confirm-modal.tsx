@@ -109,7 +109,7 @@ export function AIConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-confirm-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-line bg-surface p-5 sm:rounded-2xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-lg border border-line bg-surface p-5 sm:rounded-lg"
       >
         <header className="mb-3 flex items-start justify-between gap-3">
           <div>
@@ -132,13 +132,13 @@ export function AIConfirmModal({
         </header>
 
         {model.fallbackNotice && (
-          <p className="mb-3 rounded-xl bg-caution-bg px-3 py-2.5 text-xs text-caution">
+          <p className="mb-3 rounded-lg bg-caution-bg px-3 py-2.5 text-xs text-caution">
             {model.fallbackNotice}
           </p>
         )}
 
         {model.warnings.length > 0 && (
-          <ul className="mb-3 flex flex-col gap-1 rounded-xl bg-surface-muted px-3 py-2.5 text-xs text-muted">
+          <ul className="mb-3 flex flex-col gap-1 rounded-lg bg-surface-muted px-3 py-2.5 text-xs text-muted">
             {model.warnings.map((w) => (
               <li key={w}>· {w}</li>
             ))}
@@ -285,7 +285,7 @@ export function AIConfirmModal({
           </FieldRow>
         </div>
 
-        <label className="mt-4 flex items-start gap-2.5 rounded-xl border border-line p-3 text-sm">
+        <label className="mt-4 flex items-start gap-2.5 rounded-lg border border-line p-3 text-sm">
           <input
             type="checkbox"
             checked={reviewed}
@@ -305,7 +305,7 @@ export function AIConfirmModal({
 
         {/* [#49] 값이 아니라 계약 문장의 구조를 보고 알려준다. 저장은 막지 않는다. */}
         {riskSignals.length > 0 && (
-          <section className="mt-4 rounded-xl border border-line p-3">
+          <section className="mt-4 rounded-lg border border-line p-3">
             <h3 className="text-sm font-semibold">등록 전에 확인해 보세요</h3>
             <p className="mt-0.5 text-xs text-muted">
               저장을 막지는 않아요. 알고 등록하시라고 알려드립니다.
@@ -331,7 +331,7 @@ export function AIConfirmModal({
         )}
 
         {!gate.canSave && gate.errors.length > 0 && (
-          <ul role="alert" className="mt-3 rounded-xl bg-danger-bg px-3 py-2.5 text-xs text-danger">
+          <ul role="alert" className="mt-3 rounded-lg bg-danger-bg px-3 py-2.5 text-xs text-danger">
             {gate.errors.map((error) => (
               <li key={error}>· {error}</li>
             ))}
@@ -343,14 +343,14 @@ export function AIConfirmModal({
             type="button"
             disabled={!gate.canSave}
             onClick={() => onApply(candidate, effectiveManualExpectedDate || null)}
-            className="flex-1 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40"
+            className="flex-1 rounded-lg bg-accent-strong px-4 py-3 text-sm font-semibold text-white disabled:opacity-40"
           >
             확인한 값으로 폼 채우기
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-line px-4 py-3 text-sm text-muted"
+            className="rounded-lg border border-line px-4 py-3 text-sm text-muted"
           >
             취소
           </button>
@@ -417,7 +417,7 @@ function EvidenceSource({
   if (cursor < text.length) parts.push(text.slice(cursor));
 
   return (
-    <details className="mb-3 rounded-xl bg-surface-muted px-3 py-2.5 text-xs">
+    <details className="mb-3 rounded-lg bg-surface-muted px-3 py-2.5 text-xs">
       <summary className="cursor-pointer text-muted">원문에서 어디를 읽었는지 보기</summary>
       <p className="mt-2 leading-relaxed break-keep">{parts}</p>
       <p className="mt-2 text-muted">

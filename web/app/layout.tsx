@@ -27,7 +27,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pb-28 pt-6 sm:px-6">
+        <NavBar />
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-5 pb-28 pt-8 sm:px-8 lg:px-10">
           {children}
           {/* 기획서 13장 고지. 온보딩 한 화면에만 두면 데모처럼 곧바로 홈으로
               들어가는 경로에서는 한 번도 노출되지 않는다. 문구는 임의로 바꾸지
@@ -36,7 +37,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             {FIXED_COPY.serviceDisclaimer}
           </footer>
         </div>
-        <NavBar />
       </body>
     </html>
   );

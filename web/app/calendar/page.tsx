@@ -86,148 +86,154 @@ export default function CalendarPage() {
   const selectedProjection = byDate.get(selected) ?? null;
 
   return (
-    <main className="flex flex-col gap-4">
+    <main className="flex flex-col gap-5">
       <PageTitle title="캘린더" description="입금·유출과 일별 예상잔액을 한 달 단위로 봅니다." />
 
-      <Card
-        title={`${year}년 ${monthNumber}월`}
-        aside={
-          <span className="flex gap-1">
-            <NavButton
-              disabled={monthIndex === 0}
-              onClick={() => setMonthIndex((i) => Math.max(0, i - 1))}
-              label="이전 달"
-            >
-              ‹
-            </NavButton>
-            <NavButton
-              disabled={monthIndex >= months.length - 1}
-              onClick={() => setMonthIndex((i) => Math.min(months.length - 1, i + 1))}
-              label="다음 달"
-            >
-              ›
-            </NavButton>
-          </span>
-        }
-      >
-        <div className="grid grid-cols-7 gap-1 text-center">
-          {WEEKDAYS.map((w) => (
-            <div key={w} className="pb-1 text-xs text-muted">
-              {w}
-            </div>
-          ))}
-
-          {cells.map((date, index) => {
-            if (!date) return <div key={`empty-${index}`} />;
-
-            const projection = byDate.get(date);
-            const isDday = baseline.dDay === date;
-            const isToday = date === today;
-            const hasInflow = inflowsByDate.has(date);
-            const hasOutflow = (projection?.fixedOutflow ?? 0) > 0;
-
-            return (
-              <button
-                key={date}
-                type="button"
-                onClick={() => setSelected(date)}
-                aria-pressed={selected === date}
-                className={`relative aspect-square rounded-lg border p-1 text-xs transition-colors ${
-                  selected === date ? "border-accent" : "border-transparent"
-                } ${
-                  !projection
-                    ? "bg-surface-muted text-muted"
-                    : projection.level === "danger"
-                      ? "bg-danger-bg"
-                      : projection.level === "caution"
-                        ? "bg-caution-bg"
-                        : "bg-safe-bg"
-                }`}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <Card
+          title={`${year}년 ${monthNumber}월`}
+          className="desk-panel object-frame rounded-[26px]"
+          aside={
+            <span className="flex gap-1">
+              <NavButton
+                disabled={monthIndex === 0}
+                onClick={() => setMonthIndex((i) => Math.max(0, i - 1))}
+                label="이전 달"
               >
-                <span className={`tnum block ${isToday ? "font-bold underline" : ""}`}>
-                  {Number(date.slice(8, 10))}
-                </span>
-                <span className="mt-0.5 flex items-center justify-center gap-0.5">
-                  {hasInflow && <Dot className="bg-[var(--accent)]" />}
-                  {hasOutflow && <Dot className="bg-[var(--danger)]" />}
-                </span>
-                {isDday && (
-                  <span className="absolute inset-x-0 bottom-0.5 text-[9px] font-bold text-danger">
-                    D-day
+                ‹
+              </NavButton>
+              <NavButton
+                disabled={monthIndex >= months.length - 1}
+                onClick={() => setMonthIndex((i) => Math.min(months.length - 1, i + 1))}
+                label="다음 달"
+              >
+                ›
+              </NavButton>
+            </span>
+          }
+        >
+          <div className="grid grid-cols-7 gap-1.5 text-center">
+            {WEEKDAYS.map((w) => (
+              <div key={w} className="pb-1 text-xs text-muted">
+                {w}
+              </div>
+            ))}
+
+            {cells.map((date, index) => {
+              if (!date) return <div key={`empty-${index}`} />;
+
+              const projection = byDate.get(date);
+              const isDday = baseline.dDay === date;
+              const isToday = date === today;
+              const hasInflow = inflowsByDate.has(date);
+              const hasOutflow = (projection?.fixedOutflow ?? 0) > 0;
+
+              return (
+                <button
+                  key={date}
+                  type="button"
+                  onClick={() => setSelected(date)}
+                  aria-pressed={selected === date}
+                  className={`relative aspect-square min-h-16 rounded-lg border p-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-colors hover:border-accent sm:min-h-20 ${
+                    selected === date ? "border-accent ring-2 ring-accent-soft" : "border-transparent"
+                  } ${
+                    !projection
+                      ? "bg-surface-muted text-muted"
+                      : projection.level === "danger"
+                        ? "bg-danger-bg"
+                        : projection.level === "caution"
+                          ? "bg-caution-bg"
+                          : "bg-safe-bg"
+                  }`}
+                >
+                  <span className={`tnum block text-left ${isToday ? "font-bold underline" : ""}`}>
+                    {Number(date.slice(8, 10))}
                   </span>
+                  <span className="mt-2 flex items-center justify-start gap-1">
+                    {hasInflow && <Dot className="bg-[var(--accent)]" />}
+                    {hasOutflow && <Dot className="bg-[var(--danger)]" />}
+                  </span>
+                  {isDday && (
+                    <span className="absolute bottom-1.5 left-2 text-[9px] font-bold text-danger">
+                      D-day
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <ul className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+            <li className="flex items-center gap-1">
+              <Dot className="bg-[var(--accent)]" /> 예정 입금
+            </li>
+            <li className="flex items-center gap-1">
+              <Dot className="bg-[var(--danger)]" /> 확정 유출
+            </li>
+            <li>배경색 = 그날의 예상잔액 등급(안전·주의·위험)</li>
+          </ul>
+        </Card>
+
+        <Card
+          title={longDateLabel(selected)}
+          className="receipt-panel object-frame rounded-[26px] lg:sticky lg:top-8 lg:self-start"
+        >
+          {selectedProjection ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm text-muted">예상잔액</span>
+                <span
+                  className={`tnum text-lg font-bold ${
+                    selectedProjection.level === "danger"
+                      ? "text-danger"
+                      : selectedProjection.level === "caution"
+                        ? "text-caution"
+                        : "text-safe"
+                  }`}
+                >
+                  {won(selectedProjection.closingBalance)}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-muted">입금</p>
+                {inflowsByDate.get(selected)?.length ? (
+                  <ul className="mt-1 flex flex-col gap-1">
+                    {inflowsByDate.get(selected)!.map((i) => (
+                      <li key={i.name} className="flex justify-between gap-3 text-sm">
+                        <span>{i.name}</span>
+                        <span className="tnum">{won(i.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-sm text-muted">예정된 입금이 없습니다.</p>
                 )}
-              </button>
-            );
-          })}
-        </div>
+              </div>
 
-        <ul className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
-          <li className="flex items-center gap-1">
-            <Dot className="bg-[var(--accent)]" /> 예정 입금
-          </li>
-          <li className="flex items-center gap-1">
-            <Dot className="bg-[var(--danger)]" /> 확정 유출
-          </li>
-          <li>배경색 = 그날의 예상잔액 등급(안전·주의·위험)</li>
-        </ul>
-      </Card>
-
-      <Card title={longDateLabel(selected)}>
-        {selectedProjection ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm text-muted">예상잔액</span>
-              <span
-                className={`tnum text-lg font-bold ${
-                  selectedProjection.level === "danger"
-                    ? "text-danger"
-                    : selectedProjection.level === "caution"
-                      ? "text-caution"
-                      : "text-safe"
-                }`}
-              >
-                {won(selectedProjection.closingBalance)}
-              </span>
-            </div>
-
-            <div>
-              <p className="text-xs font-medium text-muted">입금</p>
-              {inflowsByDate.get(selected)?.length ? (
-                <ul className="mt-1 flex flex-col gap-1">
-                  {inflowsByDate.get(selected)!.map((i) => (
-                    <li key={i.name} className="flex justify-between gap-3 text-sm">
-                      <span>{i.name}</span>
-                      <span className="tnum">{won(i.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-1 text-sm text-muted">예정된 입금이 없습니다.</p>
-              )}
-            </div>
-
-            <div>
-              <p className="text-xs font-medium text-muted">유출</p>
-              {selectedProjection.fixedOutflow > 0 ? (
-                <div className="mt-1 flex justify-between gap-3 text-sm">
-                  <span>{outflowNames(selected).join(", ") || "등록 지출"}</span>
-                  <span className="tnum">{won(selectedProjection.fixedOutflow)}</span>
+              <div>
+                <p className="text-xs font-medium text-muted">유출</p>
+                {selectedProjection.fixedOutflow > 0 ? (
+                  <div className="mt-1 flex justify-between gap-3 text-sm">
+                    <span>{outflowNames(selected).join(", ") || "등록 지출"}</span>
+                    <span className="tnum">{won(selectedProjection.fixedOutflow)}</span>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-muted">등록된 유출이 없습니다.</p>
+                )}
+                <div className="mt-1 flex justify-between gap-3 text-sm text-muted">
+                  <span>필수지출 베이스라인</span>
+                  <span className="tnum">{won(selectedProjection.baselineOutflow)}</span>
                 </div>
-              ) : (
-                <p className="mt-1 text-sm text-muted">등록된 유출이 없습니다.</p>
-              )}
-              <div className="mt-1 flex justify-between gap-3 text-sm text-muted">
-                <span>필수지출 베이스라인</span>
-                <span className="tnum">{won(selectedProjection.baselineOutflow)}</span>
               </div>
             </div>
-          </div>
-        ) : (
-          <p className="text-sm text-muted">
-            시뮬레이션 기간(오늘부터 90일) 밖의 날짜입니다. 예상잔액을 계산하지 않습니다.
-          </p>
-        )}
-      </Card>
+          ) : (
+            <p className="text-sm text-muted">
+              시뮬레이션 기간(오늘부터 90일) 밖의 날짜입니다. 예상잔액을 계산하지 않습니다.
+            </p>
+          )}
+        </Card>
+      </div>
 
       <p className="px-1 text-xs text-muted">
         5월 종합소득세 신고 확인 일정은 금액 없이 안내만 제공합니다. 공휴일 반영은 P1입니다.

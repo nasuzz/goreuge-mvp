@@ -44,7 +44,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="flex flex-col gap-4">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       <PageTitle
         title="시작하기"
         description="첫 결과를 만드는 데 필요한 값만 받습니다. 계약은 등록 후 정산함에서 추가합니다."
@@ -130,7 +130,7 @@ export default function OnboardingPage() {
         </Card>
 
         {errors.length > 0 && (
-          <ul role="alert" className="rounded-xl bg-danger-bg px-4 py-3 text-sm text-danger">
+          <ul role="alert" className="rounded-lg bg-danger-bg px-4 py-3 text-sm text-danger">
             {errors.map((message) => (
               <li key={message}>{message}</li>
             ))}
@@ -139,7 +139,7 @@ export default function OnboardingPage() {
 
         <button
           type="submit"
-          className="rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background"
+          className="rounded-lg bg-accent-strong px-4 py-3 text-sm font-semibold text-white"
         >
           내 D-day 보기
         </button>
