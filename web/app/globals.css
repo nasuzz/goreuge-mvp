@@ -1,26 +1,68 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf8f4;
+  --surface: #ffffff;
+  --surface-muted: #f3f0ea;
+  --foreground: #1c1917;
+  --muted: #6b6560;
+  --line: #e3ddd3;
+
+  --safe: #15803d;
+  --safe-bg: #e8f5ec;
+  --caution: #b45309;
+  --caution-bg: #fdf3e3;
+  --danger: #b91c1c;
+  --danger-bg: #fbeaea;
+  --accent: #1d4ed8;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-safe: var(--safe);
+  --color-safe-bg: var(--safe-bg);
+  --color-caution: var(--caution);
+  --color-caution-bg: var(--caution-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #14120f;
+    --surface: #1d1a16;
+    --surface-muted: #262119;
+    --foreground: #f3efe8;
+    --muted: #a29a90;
+    --line: #332d25;
+
+    --safe: #4ade80;
+    --safe-bg: #14301f;
+    --caution: #fbbf24;
+    --caution-bg: #34260d;
+    --danger: #f87171;
+    --danger-bg: #3a1717;
+    --accent: #93b4fd;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), "Pretendard", "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  word-break: keep-all;
+}
+
+/* 숫자는 자릿수가 흔들리지 않게 고정폭으로 */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
