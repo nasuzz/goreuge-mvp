@@ -23,3 +23,9 @@ export { calculateWishPlan, applySavingsCheck } from "./savings";
 export { calculateExpectedDate } from "./expectedDate";
 export { calculateExpectedNetAmount } from "./expectedNetAmount";
 export type { ExpectedNetAmountResult } from "./expectedNetAmount";
+
+// [이슈 #50 추가]
+export { compareWhatIfCombined } from "./whatIf";
+export type { CombinedWhatIfResult } from "./whatIf";
+export { findRecovery } from "./findRecovery";
+export type { RecoveryOption, RecoveryFinding } from "./findRecovery";
