@@ -125,7 +125,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
   return (
     <li className="relative overflow-hidden rounded-2xl border border-white/75 bg-white/82 p-4 shadow-[0_8px_0_rgba(244,201,79,0.2),0_18px_28px_rgba(128,106,45,0.12),inset_0_2px_0_rgba(255,255,255,0.9)]">
       <span
-        className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--accent-warm),var(--mint),var(--lavender))]"
+        className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--accent),var(--accent-warm),var(--deep-lemon))]"
         aria-hidden
       />
       <div className="flex items-start justify-between gap-3">
@@ -138,7 +138,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
         <Badge tone={STATUS_TONE[contract.status]}>{STATUS_LABEL[contract.status]}</Badge>
       </div>
 
-      <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,var(--accent-warm-soft),var(--lavender-soft))] px-3 py-2.5 shadow-[inset_0_2px_0_rgba(255,255,255,0.75)] ring-1 ring-white/70">
+      <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,var(--accent-warm-soft),var(--cream-soft))] px-3 py-2.5 shadow-[inset_0_2px_0_rgba(255,255,255,0.75)] ring-1 ring-white/70">
         <div className="flex items-baseline justify-between gap-3">
         <span className="text-xs text-muted">
           {contract.status === "completed" ? "실수령액" : "예상 실수령액"}

@@ -5,31 +5,31 @@
   --surface: #fffdf4;
   --surface-muted: #fff0a8;
   --surface-raised: #fffbe8;
-  --foreground: #38324c;
-  --muted: #746f88;
-  --line: #f0df8f;
+  --foreground: #3f3828;
+  --muted: #7d735c;
+  --line: #ead98d;
 
-  --safe: #7d69be;
-  --safe-bg: #f0ebff;
-  --caution: #bd8b1e;
-  --caution-bg: #fff0b7;
-  --danger: #e87093;
-  --danger-bg: #ffe5ed;
+  --safe: #8d7a2f;
+  --safe-bg: #fff6cf;
+  --caution: #a87418;
+  --caution-bg: #ffeeb1;
+  --danger: #b56e39;
+  --danger-bg: #ffecd8;
   --accent: #f4c94f;
-  --accent-strong: #7962c8;
+  --accent-strong: #9c7a16;
   --accent-soft: #fff0a8;
   --accent-warm: #ffd969;
   --accent-warm-soft: #fff7d3;
-  --blue: #8fb9ff;
-  --blue-soft: #eef5ff;
-  --lavender: #b6a6e8;
-  --lavender-soft: #f0ebff;
-  --mint: #c8f1dc;
-  --mint-soft: #effbf4;
-  --peach: #ffb8a5;
-  --peach-soft: #fff0eb;
-  --ink: #38324c;
-  --ink-soft: #534c70;
+  --cream: #f3dfa2;
+  --cream-soft: #fff8df;
+  --deep-lemon: #d8c47a;
+  --deep-lemon-soft: #fff4c7;
+  --mint: #e8e0b6;
+  --mint-soft: #fff9e5;
+  --peach: #e6b06f;
+  --peach-soft: #fff0d8;
+  --ink: #3f3828;
+  --ink-soft: #675d47;
 }
 
 @theme inline {
@@ -51,10 +51,10 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-warm: var(--accent-warm);
   --color-accent-warm-soft: var(--accent-warm-soft);
-  --color-blue: var(--blue);
-  --color-blue-soft: var(--blue-soft);
-  --color-lavender: var(--lavender);
-  --color-lavender-soft: var(--lavender-soft);
+  --color-cream: var(--cream);
+  --color-cream-soft: var(--cream-soft);
+  --color-deep-lemon: var(--deep-lemon);
+  --color-deep-lemon-soft: var(--deep-lemon-soft);
   --color-mint: var(--mint);
   --color-mint-soft: var(--mint-soft);
   --color-peach: var(--peach);
@@ -81,8 +81,8 @@ body::before {
   content: "";
   background:
     radial-gradient(circle at 8% 10%, rgba(255, 255, 255, 0.72), transparent 22%),
-    radial-gradient(circle at 92% 16%, rgba(182, 166, 232, 0.2), transparent 24%),
-    radial-gradient(circle at 70% 96%, rgba(200, 241, 220, 0.34), transparent 28%),
+    radial-gradient(circle at 92% 16%, rgba(216, 196, 122, 0.2), transparent 24%),
+    radial-gradient(circle at 70% 96%, rgba(232, 224, 182, 0.34), transparent 28%),
     linear-gradient(180deg, #fff9dc 0%, #fff5bd 48%, #ffef98 100%);
 }
 
@@ -123,7 +123,7 @@ textarea {
 
 .paper-panel {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(216, 251, 244, 0.62)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 248, 223, 0.62)),
     var(--surface);
 }
 
@@ -161,8 +161,8 @@ textarea {
     linear-gradient(160deg, rgba(255, 255, 255, 0.97), rgba(240, 235, 255, 0.72)),
     var(--surface);
   box-shadow:
-    0 7px 0 rgba(182, 166, 232, 0.3),
-    0 24px 40px rgba(94, 79, 148, 0.12),
+    0 7px 0 rgba(216, 196, 122, 0.28),
+    0 24px 40px rgba(128, 106, 45, 0.12),
     0 2px 0 rgba(255, 255, 255, 0.95) inset;
 }
 
@@ -173,7 +173,7 @@ textarea {
   left: 0;
   height: 8px;
   content: "";
-  background: linear-gradient(90deg, var(--mint), var(--blue), var(--lavender));
+  background: linear-gradient(90deg, var(--accent-warm), var(--cream), var(--deep-lemon));
 }
 
 .tape-label {
@@ -213,7 +213,7 @@ textarea {
   width: 18px;
   height: 18px;
   transform: translate(36px, 26px);
-  background: linear-gradient(145deg, var(--lavender-soft), var(--lavender));
+  background: linear-gradient(145deg, var(--accent-warm-soft), var(--deep-lemon));
   box-shadow: inset 0 3px 5px rgba(255, 255, 255, 0.45);
 }
 

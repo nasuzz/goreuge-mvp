@@ -14,7 +14,7 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-white/70 bg-surface/88 p-5 shadow-[0_18px_34px_rgba(54,125,255,0.12),inset_0_2px_0_rgba(255,255,255,0.86)] backdrop-blur ${className}`}
+      className={`rounded-2xl border border-white/70 bg-surface/88 p-5 shadow-[0_18px_34px_rgba(128,106,45,0.12),inset_0_2px_0_rgba(255,255,255,0.86)] backdrop-blur ${className}`}
     >
       {(title || aside) && (
         <header className="mb-4 flex items-baseline justify-between gap-3 border-b border-line/60 pb-3">

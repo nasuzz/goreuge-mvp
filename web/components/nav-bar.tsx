@@ -17,7 +17,7 @@ export function NavBar() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/65 bg-white/76 shadow-[0_-16px_34px_rgba(54,125,255,0.14)] backdrop-blur md:sticky md:top-0 md:bottom-auto md:mb-6 md:border-b md:border-t-0 md:shadow-[0_14px_30px_rgba(54,125,255,0.1)]">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/65 bg-white/76 shadow-[0_-16px_34px_rgba(128,106,45,0.14)] backdrop-blur md:sticky md:top-0 md:bottom-auto md:mb-6 md:border-b md:border-t-0 md:shadow-[0_14px_30px_rgba(128,106,45,0.1)]">
       <div className="mx-auto hidden w-full max-w-6xl items-center justify-between px-8 py-3 lg:flex lg:px-10">
         <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <span className="size-2 rounded-full bg-accent-warm shadow-[0_0_0_5px_var(--accent-warm-soft)]" />
@@ -36,7 +36,7 @@ export function NavBar() {
                 aria-current={active ? "page" : undefined}
                 className={`flex min-h-13 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-sm transition-colors md:min-h-11 md:flex-row md:gap-2 ${
                   active
-                    ? "bg-[linear-gradient(135deg,var(--accent-soft),var(--lavender-soft))] font-semibold text-accent-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_8px_16px_rgba(255,85,173,0.16)]"
+                    ? "bg-[linear-gradient(135deg,var(--accent-warm-soft),var(--cream-soft))] font-semibold text-accent-strong shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_8px_16px_rgba(128,106,45,0.14)]"
                     : "text-muted hover:bg-white/72 hover:text-foreground"
                 }`}
               >

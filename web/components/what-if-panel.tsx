@@ -53,7 +53,7 @@ export function WhatIfPanel() {
               <label
                 className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
                   checked
-                    ? "border-white/80 bg-[linear-gradient(135deg,var(--accent-soft),var(--lavender-soft))] shadow-[inset_0_2px_0_rgba(255,255,255,0.86),0_12px_20px_rgba(255,85,173,0.13)]"
+                    ? "border-white/80 bg-[linear-gradient(135deg,var(--accent-warm-soft),var(--cream-soft))] shadow-[inset_0_2px_0_rgba(255,255,255,0.86),0_12px_20px_rgba(128,106,45,0.13)]"
                     : "border-white/70 bg-white/72 hover:bg-surface-raised"
                 }`}
               >
@@ -95,7 +95,7 @@ export function WhatIfPanel() {
           {results.map((result) => (
             <li
               key={result.assumption.label}
-              className="rounded-2xl border border-white/70 bg-white/76 p-3 shadow-[0_10px_18px_rgba(54,125,255,0.1)]"
+              className="rounded-2xl border border-white/70 bg-white/76 p-3 shadow-[0_10px_18px_rgba(128,106,45,0.1)]"
             >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-sm font-medium">{result.assumption.label}</span>

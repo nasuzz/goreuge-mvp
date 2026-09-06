@@ -71,7 +71,7 @@ export default function HomePage() {
               기준 시나리오 D-day
             </p>
             <p className="mt-2 flex flex-wrap items-end gap-x-3 gap-y-1">
-              <span className="tnum text-7xl font-black leading-none text-accent-strong drop-shadow-[0_7px_0_rgba(255,85,173,0.14)] sm:text-8xl">
+              <span className="tnum text-7xl font-black leading-none text-accent-strong drop-shadow-[0_7px_0_rgba(244,201,79,0.18)] sm:text-8xl">
                 {ddayLabel(baseline.daysRemaining)}
               </span>
               {baseline.dDay && (
@@ -94,7 +94,7 @@ export default function HomePage() {
               <HeroChip label="위험 계약" value={`${riskCause.delayedContracts.length}건`} />
             </div>
           </div>
-          <div className="relative min-h-[320px] border-t border-white/60 bg-[#fff3ad] lg:border-l lg:border-t-0">
+          <div className="relative min-h-[320px] border-t border-white/60 bg-[#fff2a8] lg:border-l lg:border-t-0">
             <Image
               src="/brand-hero.png"
               alt=""
@@ -280,9 +280,9 @@ function ScenarioCell({
 
   return (
     <li
-      className={`rounded-2xl border p-4 text-center shadow-[inset_0_2px_0_rgba(255,255,255,0.85),0_12px_20px_rgba(95,72,202,0.1)] transition-colors ${
+      className={`rounded-2xl border p-4 text-center shadow-[inset_0_2px_0_rgba(255,255,255,0.85),0_12px_20px_rgba(128,106,45,0.1)] transition-colors ${
         highlight
-          ? "border-white/80 bg-[linear-gradient(145deg,var(--accent-warm-soft),var(--lavender-soft))]"
+          ? "border-white/80 bg-[linear-gradient(145deg,var(--accent-warm-soft),var(--cream-soft))]"
           : "border-white/70 bg-white/76"
       }`}
     >
@@ -318,7 +318,7 @@ function RunwayMeter({ percent }: { percent: number }) {
     <div className="mt-6">
       <div className="h-4 overflow-hidden rounded-full bg-white/70 shadow-[inset_0_2px_6px_rgba(56,50,76,0.12)]">
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent-warm),var(--mint),var(--lavender))]"
+          className="h-full rounded-full bg-[linear-gradient(90deg,var(--accent),var(--accent-warm),var(--deep-lemon))]"
           style={{ width: `${percent}%` }}
         />
       </div>
