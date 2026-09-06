@@ -140,6 +140,8 @@ export function AIConfirmModal({
           </ul>
         )}
 
+        <EvidenceSource text={model.evidenceText} fields={fields} />
+
         <div className="flex flex-col gap-3">
           <FieldRow review={findField(fields, "clientName")}>
             <input
@@ -335,6 +337,64 @@ function findField(fields: AIConfirmationViewModel["fields"], field: CandidateFi
   return fields.find((f) => f.field === field)!;
 }
 
+/**
+ * [#48] 원문을 그대로 보여주고 각 후보값의 근거 구간을 강조한다.
+ *
+ * "AI가 이렇게 읽었습니다"에서 "AI가 원문 여기를 보고 이렇게 읽었습니다"로 바뀐다.
+ * 사용자가 값을 하나씩 눈으로 대조하는 대신 강조된 자리만 보면 된다.
+ *
+ * 근거 구간은 결정적 파서만 만들 수 있어 AI 경로에서는 없다. 그때는 이 영역을
+ * 통째로 감춘다 — 빈 상자를 남기면 "근거가 없다"는 뜻으로 읽힌다.
+ */
+function EvidenceSource({
+  text,
+  fields,
+}: {
+  text: string | null;
+  fields: AIConfirmationViewModel["fields"];
+}) {
+  if (!text) return null;
+
+  const spans = fields
+    .flatMap((field) =>
+      field.evidence?.span
+        ? [{ ...field.evidence.span, field: field.field, demoted: field.evidence.demotedReason !== null }]
+        : [],
+    )
+    .sort((a, b) => a.start - b.start);
+
+  if (spans.length === 0) return null;
+
+  // 구간이 겹치면 앞선 것만 남긴다. 겹친 채로 자르면 문자가 중복되거나 사라진다.
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const span of spans) {
+    if (span.start < cursor) continue;
+    if (span.start > cursor) parts.push(text.slice(cursor, span.start));
+    parts.push(
+      <mark
+        key={`${span.field}-${span.start}`}
+        title={FIELD_LABEL[span.field]}
+        className={`rounded px-0.5 text-foreground ${span.demoted ? "bg-danger-bg" : "bg-caution-bg"}`}
+      >
+        {text.slice(span.start, span.end)}
+      </mark>,
+    );
+    cursor = span.end;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+
+  return (
+    <details className="mb-3 rounded-xl bg-surface-muted px-3 py-2.5 text-xs">
+      <summary className="cursor-pointer text-muted">원문에서 어디를 읽었는지 보기</summary>
+      <p className="mt-2 leading-relaxed break-keep">{parts}</p>
+      <p className="mt-2 text-muted">
+        강조는 각 후보값의 근거 구간입니다. 빨간 강조는 자기 검증에서 의심스럽다고 판정한 구간입니다.
+      </p>
+    </details>
+  );
+}
+
 function FieldRow({
   review,
   children,
@@ -362,6 +422,16 @@ function FieldRow({
         </span>
       </span>
       {children}
+      {/* [#48] 자기 검증에 걸린 필드는 왜 확신도가 낮은지 그 자리에서 알려준다.
+          "확신도 40%" 배지만으로는 사용자가 무엇을 봐야 하는지 알 수 없다. */}
+      {review.evidence?.demotedReason && (
+        <span className="text-xs text-danger">※ {review.evidence.demotedReason}</span>
+      )}
+      {review.evidence?.span && (
+        <span className="text-xs text-muted">
+          원문 근거: <mark className="rounded bg-caution-bg px-1 text-foreground">{review.evidence.span.text}</mark>
+        </span>
+      )}
     </label>
   );
 }
