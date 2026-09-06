@@ -12,7 +12,7 @@
     "expected-holiday-verify": "npm run build && node dist/test/expected-holiday-verify.js",
     "issue16-verify": "npm run build && node dist/test/issue16-verify.js",
     "test:ai": "npm run build && node dist/test/ai-evaluation.js",
-    "test:ai-confirmation": "npm run build && node dist/test/ai-confirmation-flow.js",
+    "test:ai-confirmation": "npm run build && node dist/test/ai-confirmation-flow.js && node dist/test/contract-risk-verify.js",
     "verify": "npm run typecheck && npm run build && node test/run-verify.mjs"
   },
   "devDependencies": {
