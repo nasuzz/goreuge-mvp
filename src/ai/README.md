@@ -4,6 +4,7 @@
 
 - `contract-parser.ts`: API 장애 시에도 동작하는 수기 확인용 로컬 파서
 - `parser-service.ts`: 실제 AI provider를 주입하고 출력 검증 후 자동 fallback
+- `gemini-provider.ts`: 서버 전용 Gemini API provider
 - `openai-provider.ts`: 서버 전용 OpenAI Responses API Structured Outputs provider
 - `privacy-mask.ts`: 외부 AI 전송 전 거래처명·계좌번호 마스킹 및 로컬 복원
 - `review-rules.ts`: C 확인 모달의 confidence 단계와 저장 가능 여부 계산
@@ -32,7 +33,18 @@ const result = await parseContractWithFallback(text, "2026-09-01");
 
 실제 AI API를 붙일 때는 `AIContractProvider`의 `parse()`를 구현해 세 번째 인자로 전달합니다. AI가 잘못된 JSON, 범위 밖 confidence, 잘못된 날짜 형식 등을 반환하면 로컬 파서로 자동 전환됩니다.
 
-OpenAI를 사용할 때는 서버 코드에서만 provider를 생성합니다.
+Gemini를 사용할 때는 서버 코드에서만 provider를 생성합니다.
+
+```ts
+import { createGeminiProviderFromEnv } from "../ai/gemini-provider";
+
+const provider = createGeminiProviderFromEnv();
+const result = await parseContractWithFallback(text, referenceDate, provider);
+```
+
+`GEMINI_API_KEY`는 서버 환경변수로만 설정하며 `NEXT_PUBLIC_` 접두사를 붙이지 않습니다. 기본 모델은 `gemini-3-flash-preview`이고 `GEMINI_MODEL`로 교체할 수 있습니다.
+
+OpenAI를 사용할 때도 서버 코드에서만 provider를 생성합니다. `GEMINI_API_KEY`와 `OPENAI_API_KEY`가 둘 다 있으면 API route는 Gemini를 우선 사용합니다.
 
 ```ts
 import { createOpenAIProviderFromEnv } from "../ai/openai-provider";
