@@ -21,19 +21,16 @@ import { diffDays } from "./scenarioDate";
  * @param completedContracts 이 거래처의 완료(status === "completed") 계약들.
  *   호출부가 이미 필터링해서 넘긴다는 전제다 — 이 함수는 상태를 다시 확인하지 않는다.
  *
- * completedCount는 넘어온 배열 길이 그대로다("완료 건수", 3-10).
- * medianDelayDays/p90DelayDays는 그중 지연일을 계산할 수 있는 건(actualDate·
- * expectedDate가 모두 있는 건)이 clientHistoryMinCount(3)건 미만이면 null이다 —
- * completedCount가 3 이상이어도, 지연일 데이터 자체가 3건 미만이면 중앙값·
- * p90을 낼 근거가 없다.
+ * completedCount는 지연일을 계산할 수 있는 완료 건(actualDate·expectedDate가
+ * 모두 있는 건)의 수다. scenarioDate.resolveDelay가 이 값으로 cold_start와
+ * client_history를 가르기 때문에 medianDelayDays/p90DelayDays와 같은 표본을
+ * 써야 한다.
  *
  * 지연일 = actualDate - expectedDate, 음수(예정보다 일찍 입금)는 0으로 clamp한다
  * (기획서에 "일찍 들어온 것"까지 다음 예측에 유리하게 반영한다는 규정이 없어서,
  * 보수적으로 0 미만은 만들지 않는다).
  */
 export function recalculateClientStats(client: Client, completedContracts: Contract[]): Client {
-  const completedCount = completedContracts.length;
-
   const delayDays = completedContracts
     .filter((c): c is Contract & { expectedDate: DateString; actualDate: DateString } =>
       c.expectedDate !== null && c.actualDate !== null,
@@ -41,6 +38,7 @@ export function recalculateClientStats(client: Client, completedContracts: Contr
     .map((c) => Math.max(0, diffDays(c.expectedDate, c.actualDate)))
     .sort((a, b) => a - b);
 
+  const completedCount = delayDays.length;
   const hasEnoughHistory = delayDays.length >= MVP_POLICY.clientHistoryMinCount;
 
   return {

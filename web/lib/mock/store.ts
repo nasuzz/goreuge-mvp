@@ -8,7 +8,7 @@
 // localStorage 복원을 effect 안의 setState로 하면 렌더가 연쇄로 도는데,
 // 외부 저장소로 두면 구독 시점에 한 번만 복원하면 되기 때문이다.
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import {
   calculateExpectedDate,
   calculateExpectedNetAmount,
@@ -16,6 +16,7 @@ import {
   cancelContract,
   compareWhatIf,
   confirmPayment,
+  findRecovery,
   markContractAsRisk,
   recalculateClientStats,
   recalculateContractStatuses,
@@ -35,6 +36,7 @@ import type {
   WhatIfAssumption,
   WhatIfResult,
 } from "@/shared/types";
+import type { RecoveryFinding } from "@/engine/index";
 
 /** 데모 기준일은 shared-spec D11에 따라 2026-09-01로 고정한다. */
 const NOW = TODAY + "T09:00:00+09:00";
@@ -246,8 +248,8 @@ export function confirmContractPayment(
       : c,
   );
   const target = contracts.find((c) => c.id === contractId);
-  // recalculateClientStats는 넘긴 배열을 "이 거래처의 완료 계약"으로 그대로 센다.
-  // clientId를 스스로 거르지 않으므로 호출부가 걸러 넘겨야 completedCount가 맞는다.
+  // recalculateClientStats는 넘긴 배열을 이 거래처의 완료 계약 표본으로 본다.
+  // clientId를 스스로 거르지 않으므로 호출부가 걸러 넘겨야 지연 통계 표본이 맞는다.
   const clients = target
     ? snapshot.input.clients.map((cl) =>
         cl.id === target.clientId
@@ -315,6 +317,18 @@ export function useMockStore() {
     runWhatIf,
     reset,
   };
+}
+
+/**
+ * 협상 카드 (#50). 홈에서만 쓴다.
+ *
+ * build()에 넣어 스냅샷마다 미리 계산하면, 캘린더·정산함·위시함에서 계약을 바꿔도
+ * 쓰지 않을 결과를 매번 만든다. 실측하면 findRecovery는 runAllScenarios의 약 12배다
+ * (26.9ms vs 2.3ms). 그래서 쓰는 화면에서 input이 바뀔 때만 계산한다.
+ */
+export function useRecovery(): RecoveryFinding {
+  const { input } = useMockStore();
+  return useMemo(() => findRecovery(input, NOW), [input]);
 }
 
 /** 계약이 가진 거래처 이름을 찾는다. */

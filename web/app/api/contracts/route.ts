@@ -5,7 +5,7 @@ import { getWithholdingReference } from "@/shared/policy";
 import { calculateExpectedDate, calculateExpectedNetAmount, recalculateContractStatuses, runAllScenarios } from "@/engine/index";
 import { clock } from "@/lib/clock";
 // 거래처 정규화는 Mock 저장소와 같은 함수를 쓴다. 복사본이 둘이면 한쪽만 바뀌었을 때
-// "B미디어"와 "B 미디어"가 서로 다른 거래처로 갈리고, 완료 이력이 나뉘어 지연 예측이
+// "B미디어"와 "B 미디어"가 서로 다른 거래처로 갈리고, 지연 통계 표본이 나뉘어 지연 예측이
 // cold_start로 떨어진다 (PR #25 리뷰).
 import { normalizeClientName } from "@/lib/client-name";
 import { ApiError, asObject, errorResponse, requiredString } from "@/lib/api/errors";
