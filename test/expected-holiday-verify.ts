@@ -68,19 +68,49 @@ check(
   null,
 );
 
-// ── [PR #63 리뷰 반영] 공휴일 캐시가 커버하지 않는 연도 ──────────
-//
-// 커버 밖에서 주말 보정만 돌면 "보정된 영업일"처럼 보이지만 공휴일이 조용히 빠진다.
-// 실제로 2027-02-28(일)이 2027-03-01(삼일절)로 이동해 공휴일을 예정입금일로 내놨었다.
-// 손대지 않는 쪽이 틀린 답을 확신 있게 주는 것보다 낫다.
+console.log("── 캐시에 없는 연도(2027)는 보정하지 않음 (PR #63 리뷰: lyoonji) ──");
 check(
-  "커버 밖 연도(2027)는 보정하지 않고 원래 날짜 유지",
+  // 완료 2027-01-15 + 익월 말일 = 2027-02-28(일). 커버 밖 연도라 주말이어도 그대로 반환.
+  // (보정했다면 2027-03-01(월)이 되는데, 그날은 삼일절이라 실제로는 영업일이 아니다 —
+  //  캐시가 2027을 모르므로 "틀리게 보정"하는 대신 아예 손대지 않는다.)
+  "2027-02-28(일)도 커버 밖이라 보정 없이 그대로",
   calculateExpectedDate(
     { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2027-01-15", invoiceDate: null },
     { adjustWeekendHoliday: true },
   ),
   "2027-02-28",
 );
+check(
+  // 완료 2026-12-20 + NET_DAYS 60일 = 2027-02-18(목, 평일). 연도가 커버 밖이라
+  // 애초에 보정 대상 여부도 판단하지 않고 그대로 반환(우연히 평일이라 결과는 같지만
+  // 판단 로직 자체가 스킵되는 걸 확인하는 회귀 케이스).
+  "연말 계약이 다음 해로 넘어가는 예정일도 커버 밖이면 그대로",
+  calculateExpectedDate(
+    { settlementTerm: "NET_DAYS", settlementDay: 60, completionDate: "2026-12-20", invoiceDate: null },
+    { adjustWeekendHoliday: true },
+  ),
+  "2027-02-18",
+);
+check(
+  // 연휴가 연말에 이틀 연속(12/30, 12/31)이라고 가정하고 하루씩 밀다 보면 2027-01-01로
+  // 넘어간다 — 그 순간 연도가 coveredYears(2026) 밖이 되므로, 1/1 자체가 공휴일인지는
+  // 더 확인하지 않고 거기서 멈춘다(실제 신정 여부와 무관하게 "더는 모른다"가 정답).
+  "연휴 보정 도중 커버 밖 연도로 넘어가면 그 지점에서 멈춘다",
+  calculateExpectedDate(
+    { settlementTerm: "ON_COMPLETION", settlementDay: null, completionDate: "2026-12-30", invoiceDate: null },
+    {
+      adjustWeekendHoliday: true,
+      holidays: new Set(["2026-12-30", "2026-12-31"]),
+      coveredYears: new Set([2026]),
+    },
+  ),
+  "2027-01-01",
+);
+
+// 위 케이스에 더해, 커버 판정이 "캐시에 그 연도 날짜가 하나라도 있으면 커버"로
+// 느슨해지지 않는지도 고정해 둔다. 2028은 윤년 테스트용으로 2028-01-01 한 건만
+// 들어 있어서, 캐시 키에서 연도를 추출하는 구현이었다면 2028을 커버로 오인하고
+// 2028-03-01(삼일절)을 영업일로 판정하게 된다.
 check(
   "공휴일이 1건만 든 연도(2028)도 커버로 치지 않는다",
   calculateExpectedDate(
@@ -89,16 +119,11 @@ check(
   ),
   "2028-03-31",
 );
+// 반대 방향 — 커버 연도를 넘겨주면 그 연도도 정상적으로 보정된다.
+// 나중에 2027 공휴일 자료를 확인해 캐시에 넣을 때, 코드 변경 없이 데이터만
+// 추가하면 동작한다는 것을 고정한다.
 check(
-  "커버 연도(2026)는 그대로 보정된다 — 회귀",
-  calculateExpectedDate(
-    { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2026-09-03", invoiceDate: null },
-    { adjustWeekendHoliday: true },
-  ),
-  "2026-11-02",
-);
-check(
-  "커버 연도를 넘겨주면 그 연도도 보정 대상이 된다",
+  "coveredYears를 넘기면 그 연도도 보정 대상이 된다",
   calculateExpectedDate(
     { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2027-01-15", invoiceDate: null },
     {
