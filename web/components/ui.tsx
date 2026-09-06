@@ -14,12 +14,14 @@ export function Card({
 }) {
   return (
     <section
-      className={`rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${className}`}
+      className={`rounded-2xl border border-white/70 bg-surface/88 p-5 shadow-[0_18px_34px_rgba(128,106,45,0.12),inset_0_2px_0_rgba(255,255,255,0.86)] backdrop-blur ${className}`}
     >
       {(title || aside) && (
-        <header className="mb-3 flex items-baseline justify-between gap-3">
-          {title && <h2 className="text-sm font-semibold tracking-tight">{title}</h2>}
-          {aside && <div className="text-xs text-muted">{aside}</div>}
+        <header className="mb-4 flex items-baseline justify-between gap-3 border-b border-line/60 pb-3">
+          {title && (
+            <h2 className="text-[13px] font-semibold text-foreground">{title}</h2>
+          )}
+          {aside && <div className="text-xs font-medium text-muted">{aside}</div>}
         </header>
       )}
       {children}
@@ -30,17 +32,18 @@ export function Card({
 export function PageTitle({ title, description }: { title: string; description?: string }) {
   return (
     <header className="mb-5">
-      <h1 className="text-xl font-bold tracking-tight">{title}</h1>
-      {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+      <p className="brand-kicker mb-2">Goreuge</p>
+      <h1 className="text-[28px] font-semibold leading-tight sm:text-[32px]">{title}</h1>
+      {description && <p className="mt-1.5 text-sm leading-6 text-muted">{description}</p>}
     </header>
   );
 }
 
 const TONE = {
-  safe: "bg-safe-bg text-safe",
-  caution: "bg-caution-bg text-caution",
-  danger: "bg-danger-bg text-danger",
-  neutral: "bg-surface-muted text-muted",
+  safe: "bg-safe-bg text-safe ring-safe/15",
+  caution: "bg-caution-bg text-caution ring-caution/10",
+  danger: "bg-danger-bg text-danger ring-danger/10",
+  neutral: "bg-white/70 text-muted ring-white/70",
 } as const;
 
 export type Tone = keyof typeof TONE;
@@ -48,7 +51,7 @@ export type Tone = keyof typeof TONE;
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${TONE[tone]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm ring-1 ${TONE[tone]}`}
     >
       {children}
     </span>
@@ -70,7 +73,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-line px-5 py-10 text-center">
+    <div className="rounded-lg border border-dashed border-line bg-surface-muted/45 px-5 py-10 text-center">
       <p className="text-sm font-medium">{title}</p>
       <p className="mx-auto mt-1 max-w-xs text-sm text-muted">{description}</p>
       {action && <div className="mt-4">{action}</div>}

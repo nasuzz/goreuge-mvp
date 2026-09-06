@@ -123,7 +123,11 @@ export function ContractCard({ contract }: { contract: Contract }) {
   }
 
   return (
-    <li className="rounded-2xl border border-line bg-surface p-4">
+    <li className="relative overflow-hidden rounded-2xl border border-white/75 bg-white/82 p-4 shadow-[0_8px_0_rgba(244,201,79,0.2),0_18px_28px_rgba(128,106,45,0.12),inset_0_2px_0_rgba(255,255,255,0.9)]">
+      <span
+        className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--accent),var(--accent-warm),var(--deep-lemon))]"
+        aria-hidden
+      />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{clientName}</p>
@@ -134,13 +138,15 @@ export function ContractCard({ contract }: { contract: Contract }) {
         <Badge tone={STATUS_TONE[contract.status]}>{STATUS_LABEL[contract.status]}</Badge>
       </div>
 
-      <div className="mt-3 flex items-baseline justify-between gap-3">
+      <div className="mt-4 rounded-2xl bg-[linear-gradient(135deg,var(--accent-warm-soft),var(--cream-soft))] px-3 py-2.5 shadow-[inset_0_2px_0_rgba(255,255,255,0.75)] ring-1 ring-white/70">
+        <div className="flex items-baseline justify-between gap-3">
         <span className="text-xs text-muted">
           {contract.status === "completed" ? "실수령액" : "예상 실수령액"}
         </span>
-        <span className="tnum text-base font-semibold">
+        <span className="tnum text-lg font-semibold">
           {net.amount === null ? "추정 불가" : won(net.amount)}
         </span>
+        </div>
       </div>
 
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -184,7 +190,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
           )}
         </div>
       ) : action === "payment" ? (
-        <div className="mt-3 rounded-xl border border-line p-3">
+        <div className="mt-3 rounded-lg border border-line p-3">
           <p className="text-xs font-medium">입금 확인</p>
           <p className="mt-1 text-xs text-muted">
             통장에 실제로 찍힌 날짜와 금액을 넣어 주세요. 공제율은 총액과 실수령액으로
@@ -220,7 +226,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
             <button
               type="button"
               onClick={submit}
-              className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+              className="rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-semibold text-white"
             >
               확인
             </button>
@@ -236,7 +242,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
           </div>
         </div>
       ) : (
-        <div className="mt-3 rounded-xl border border-line p-3">
+        <div className="mt-3 rounded-lg border border-line p-3">
           <label className="text-xs font-medium" htmlFor={`reason-${contract.id}`}>
             {action === "risk" ? "위험으로 지정하는 사유" : "취소 사유"}
           </label>
@@ -256,7 +262,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
             <button
               type="button"
               onClick={submit}
-              className="rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+              className="rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-semibold text-white"
             >
               저장
             </button>
@@ -274,7 +280,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
       )}
 
       {reminderOpen && (
-        <div className="mt-3 rounded-xl border border-line p-3">
+        <div className="mt-3 rounded-lg border border-line p-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold">독촉 초안</p>
@@ -342,7 +348,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
               <button
                 type="button"
                 onClick={copyReminder}
-                className="mt-3 w-full rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background"
+                className="mt-3 w-full rounded-lg bg-accent-strong px-3 py-2 text-xs font-semibold text-white"
               >
                 {copied ? "복사됨" : "복사하기"}
               </button>
@@ -394,7 +400,7 @@ function SegmentedControl({
             onClick={() => onChange(key)}
             aria-pressed={value === key}
             className={`rounded-md px-2 py-1.5 text-xs ${
-              value === key ? "bg-foreground text-background" : "text-muted hover:text-foreground"
+              value === key ? "bg-accent-strong text-white" : "text-muted hover:text-foreground"
             }`}
           >
             {text}

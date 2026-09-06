@@ -21,47 +21,55 @@ export default function WishPage() {
   const taxReserves = input.savings.filter((s) => s.kind === "tax");
 
   return (
-    <main className="flex flex-col gap-4">
+    <main className="flex flex-col gap-5">
       <PageTitle
         title="위시함"
         description="옮겨둔 돈은 가용잔액에서 빠집니다. 보호가 D-day를 어떻게 바꾸는지 함께 봅니다."
       />
 
-      <Card title="세금 준비금">
-        {taxReserves.length === 0 ? (
-          <EmptyState title="준비금이 없습니다" description="세금 준비금을 만들면 여기에 표시됩니다." />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {taxReserves.map((saving) => (
-              <SavingRow
-                key={saving.id}
-                saving={saving}
-                weeklyAvailable={weeklyAvailable}
-                today={today}
-                onCheck={checkSaving}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card title="세금 준비금" className="receipt-panel object-frame rounded-[26px]">
+          {taxReserves.length === 0 ? (
+            <EmptyState
+              title="준비금이 없습니다"
+              description="세금 준비금을 만들면 여기에 표시됩니다."
+            />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {taxReserves.map((saving) => (
+                <SavingRow
+                  key={saving.id}
+                  saving={saving}
+                  weeklyAvailable={weeklyAvailable}
+                  today={today}
+                  onCheck={checkSaving}
+                />
+              ))}
+            </ul>
+          )}
+        </Card>
 
-      <Card title="위시 적립">
-        {wishes.length === 0 ? (
-          <EmptyState title="적립 중인 위시가 없습니다" description="사고 싶은 것을 등록하면 여기에 표시됩니다." />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {wishes.map((saving) => (
-              <SavingRow
-                key={saving.id}
-                saving={saving}
-                weeklyAvailable={weeklyAvailable}
-                today={today}
-                onCheck={checkSaving}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+        <Card title="위시 적립" className="desk-panel object-frame rounded-[26px]">
+          {wishes.length === 0 ? (
+            <EmptyState
+              title="적립 중인 위시가 없습니다"
+              description="사고 싶은 것을 등록하면 여기에 표시됩니다."
+            />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {wishes.map((saving) => (
+                <SavingRow
+                  key={saving.id}
+                  saving={saving}
+                  weeklyAvailable={weeklyAvailable}
+                  today={today}
+                  onCheck={checkSaving}
+                />
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
 
       {/* 기획서 7장이 지정한 고정 문구. 앱은 계좌이체를 실행하지 않는다. */}
       <p className="px-1 text-xs text-muted">{FIXED_COPY.transferDisclaimer}</p>
@@ -98,7 +106,7 @@ function SavingRow({
   }
 
   return (
-    <li className="rounded-xl border border-line p-3">
+    <li className="rounded-lg border border-line p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{saving.name}</p>
@@ -150,7 +158,7 @@ function SavingRow({
         <button
           type="button"
           onClick={check}
-          className="mt-2 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background"
+          className="mt-2 rounded-lg bg-accent-strong px-3 py-1.5 text-xs font-semibold text-white"
         >
           {won(saving.plannedAmount)} 옮겼다고 체크
         </button>
