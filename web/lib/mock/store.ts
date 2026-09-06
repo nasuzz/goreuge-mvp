@@ -14,7 +14,9 @@ import {
   calculateExpectedNetAmount,
   cancelContract,
   compareWhatIf,
+  confirmPayment,
   markContractAsRisk,
+  recalculateClientStats,
   recalculateContractStatuses,
   revertManualStatus,
   runAllScenarios,
@@ -27,6 +29,7 @@ import type {
   Client,
   Contract,
   ContractCreateInput,
+  DateString,
   EngineInput,
   WhatIfAssumption,
   WhatIfResult,
@@ -224,6 +227,33 @@ export function revert(contractId: string) {
   applyToContract(contractId, (c) => revertManualStatus(c, "waiting", NOW));
 }
 
+/**
+ * 입금 확인 (engine-interface.md 3-9, 이슈 #55).
+ *
+ * 계약을 완료로 확정하고 공제율을 역산한 뒤, 그 거래처의 지연 통계를 다시 계산한다(3-10).
+ * 통계는 D-day 시나리오가 쓰는 입금일 추정 근거라, 같이 갱신하지 않으면 방금 확인한
+ * 입금이 다음 계산에 반영되지 않는다.
+ */
+export function confirmContractPayment(
+  contractId: string,
+  actualDate: DateString,
+  actualNetAmount: number,
+) {
+  const contracts = snapshot.input.contracts.map((c) =>
+    c.id === contractId
+      ? confirmPayment(c, { contractId, actualDate, actualNetAmount }, NOW)
+      : c,
+  );
+  const target = contracts.find((c) => c.id === contractId);
+  const clients = target
+    ? snapshot.input.clients.map((cl) =>
+        cl.id === target.clientId ? recalculateClientStats(cl, contracts) : cl,
+      )
+    : snapshot.input.clients;
+
+  commit({ ...snapshot.input, contracts, clients }, snapshot.onboarded);
+}
+
 export function runWhatIf(assumptions: WhatIfAssumption[]): WhatIfResult[] {
   return compareWhatIf(snapshot.input, assumptions, NOW);
 }
@@ -249,6 +279,7 @@ export function useMockStore() {
     markRisk,
     cancel,
     revert,
+    confirmContractPayment,
     runWhatIf,
     reset,
   };
