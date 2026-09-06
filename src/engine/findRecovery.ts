@@ -1,0 +1,328 @@
+// engine/findRecovery.ts — 협상 카드: D-day를 되돌리는 최소 조건 탐색
+// 이슈 #50 [AI][P1]. DRI: C(탐색·화면), A(엔진 API), B(문구).
+//
+// [무엇을 푸는가]
+// 대응안 비교(6-1)는 사용자가 이미 정한 가정을 넣으면 며칠인지 계산해준다.
+// 그래서 "얼마를 언제까지 받아야 하는가"는 여전히 사용자가 맞혀야 한다.
+// 그게 어렵다는 건 우리가 직접 겪었다 — 기획서 예시였던 "선금 500,000원 9/15"는
+// 위험 전환 이후 상태에서 효과가 정확히 0일이었다(이슈 #8). 그날 유출이
+// 820,000원인데 500,000원으로는 못 넘겼다. 기획한 사람도 못 맞힌 숫자다.
+//
+// 이 파일은 그 반대 방향을 푼다: D-day를 받아서 그것을 되돌리는 최소 조건을 찾는다.
+//
+// [설계 원칙]
+//   - 엔진 계산을 재구현하지 않는다. 후보를 만들어 compareWhatIf에 넘기고
+//     결과를 고르기만 한다. 가정 반영 규칙(가상 거래처 생성, monthly outflow 분할)은
+//     whatIf.ts 안에 있고 이 파일은 모른다.
+//   - 순수함수. 같은 입력이면 항상 같은 결과가 나온다. 후보 사다리는 상수로 고정한다.
+//   - 숫자는 전부 엔진 반환값이다. 이 파일이 금액·날짜·일수를 지어내지 않는다.
+//   - 선금 "요청"을 실제 입금으로 처리하지 않는다(기획서 13장). 결과는 가정일 뿐이다.
+//
+// [날짜 프레이밍 — (나) 최대 유예]
+// 가장 이른 날짜를 고르면 "내일까지 300,000원 주세요"가 되는데 협상에서 쓸 수 없다.
+// 거래처에 하는 말은 "언제까지 주시면 됩니다"이므로, 금액을 정한 뒤 그 금액으로
+// 아직 효과가 있는 **가장 늦은 날짜**를 찾아 latestDate로 싣는다(이슈 #50 6절).
+
+import type {
+  EngineInput, WhatIfAssumption, DateString, DateTimeString, Won,
+} from "../shared/types";
+import { runScenario } from "./simulate";
+import { compareWhatIf } from "./whatIf";
+import { addDays, diffDays } from "./scenarioDate";
+import { MVP_POLICY } from "../shared/policy";
+
+export interface RecoveryOption {
+  /** 엔진이 실제로 평가한 가정 그대로. 화면은 이걸 그대로 compareWhatIf에 다시 넘길 수 있다 */
+  assumption: WhatIfAssumption;
+  dayDelta: number;
+  dDayBefore: DateString | null;
+  dDayAfter: DateString | null;
+  /** (나) 프레이밍: 이 금액이면 언제까지 들어와야 하는가. 선금 가정에만 있다 */
+  latestDate: DateString | null;
+  /** 화면에 그대로 쓰는 근거. 숫자는 전부 엔진 결과에서 온다 */
+  rationale: string[];
+  /** 사용자가 치러야 하는 것 */
+  effortLabel: string;
+}
+
+export interface RecoveryFinding {
+  dDay: DateString | null;
+  daysRemaining: number | null;
+  /** 최대 3개(maxWhatIfAssumptions). dayDelta 내림차순 */
+  options: RecoveryOption[];
+  /** 제안할 게 없을 때의 이유. 있으면 options는 빈 배열 */
+  emptyReason: string | null;
+}
+
+// ── 후보 사다리 ────────────────────────────────────────────
+// 결정적 탐색을 위해 상수로 고정한다. 잔액이나 유출액에서 파생시키면 입력이 조금만
+// 달라져도 후보가 통째로 바뀌어 회귀 테스트로 고정할 수 없다.
+
+const ADVANCE_AMOUNTS: Won[] = [
+  100_000, 200_000, 300_000, 500_000, 800_000,
+  1_000_000, 1_500_000, 2_000_000, 3_000_000,
+];
+
+const DELAY_DAYS: number[] = [7, 14, 21, 30];
+
+const REDUCE_AMOUNTS: Won[] = [50_000, 100_000, 200_000, 300_000, 500_000];
+
+/**
+ * "최소 조건"을 곧이곧대로 "효과가 1일이라도 나는 가장 작은 값"으로 잡으면 협상
+ * 카드로 못 쓴다 — mock 기준 상태에서 그렇게 고르면 "선금 100,000원 -> +3일"이
+ * 나온다. 거래처에 전화해서 요구할 만한 크기가 아니다.
+ *
+ * 그래서 먼저 "일주일은 벌어주는" 값을 찾고, 사다리 안에 그런 값이 없을 때만
+ * 효과가 나는 최소값으로 물러난다. 일주일인 이유는 이슈 #50 프로토타입 실측이
+ * 그 근처에 몰려 있어서다(기준 상태 300,000원 -> +8일, 위험 전환 후
+ * 800,000원 -> +7일). 물러난 경우는 rationale에 그대로 밝힌다.
+ */
+const RECOVERY_TARGET_DAYS = 7;
+
+/**
+ * 사다리를 오름차순으로 훑어 (1) 목표 일수를 넘기는 첫 값, (2) 없으면 효과가
+ * 나는 첫 값을 고른다. 사다리가 상수라 결과는 결정적이다.
+ */
+function pickFromLadder<T>(
+  ladder: T[],
+  deltaOf: (candidate: T) => number,
+): { picked: T; delta: number; reachedTarget: boolean } | null {
+  let fallback: { picked: T; delta: number } | null = null;
+  for (const candidate of ladder) {
+    const delta = deltaOf(candidate);
+    if (delta <= 0) continue;
+    if (fallback === null) fallback = { picked: candidate, delta };
+    if (delta >= RECOVERY_TARGET_DAYS) {
+      return { picked: candidate, delta, reachedTarget: true };
+    }
+  }
+  return fallback === null ? null : { ...fallback, reachedTarget: false };
+}
+
+export function findRecovery(input: EngineInput, now: DateTimeString): RecoveryFinding {
+  const baseline = runScenario(input, "baseline");
+
+  if (baseline.dDay === null) {
+    return {
+      dDay: null,
+      daysRemaining: null,
+      options: [],
+      emptyReason: `지금 계획으로는 ${MVP_POLICY.simulationHorizonDays}일 안에 잔액이 바닥나지 않아요. 되돌릴 조건을 찾을 필요가 없습니다.`,
+    };
+  }
+
+  const evaluate = makeEvaluator(input, now);
+
+  const options: RecoveryOption[] = [];
+  const advance = findAdvancePayment(input, baseline.dDay, evaluate);
+  if (advance) options.push(advance);
+  const delay = findDelayOutflow(input, baseline.dDay, evaluate);
+  if (delay) options.push(delay);
+  const reduce = findReduceSpending(evaluate);
+  if (reduce) options.push(reduce);
+
+  options.sort((a, b) => b.dayDelta - a.dayDelta);
+  const trimmed = options.slice(0, MVP_POLICY.maxWhatIfAssumptions);
+
+  return {
+    dDay: baseline.dDay,
+    daysRemaining: baseline.daysRemaining,
+    options: trimmed,
+    emptyReason: trimmed.length > 0
+      ? null
+      : "지금 조건으로는 D-day를 되돌리는 방법을 찾지 못했어요. 금액을 더 올리거나 다른 유출을 조정해 보세요.",
+  };
+}
+
+// ── 평가기 ─────────────────────────────────────────────────
+
+interface Evaluation {
+  dayDelta: number;
+  dDayBefore: DateString | null;
+  dDayAfter: DateString | null;
+}
+
+/**
+ * 가정 하나를 엔진에 태워 결과만 돌려준다. compareWhatIf가 baseline을 매번 다시
+ * 계산하지만, 후보 수십 개 기준 실측 60~170ms라 브라우저에서 문제 없다(이슈 #50 2절).
+ */
+function makeEvaluator(input: EngineInput, now: DateTimeString) {
+  return (assumption: WhatIfAssumption): Evaluation => {
+    const [result] = compareWhatIf(input, [assumption], now);
+    return {
+      dayDelta: result.dayDelta,
+      dDayBefore: result.dDayBefore,
+      dDayAfter: result.dDayAfter,
+    };
+  };
+}
+
+// ── 1. 선금 ────────────────────────────────────────────────
+
+function findAdvancePayment(
+  input: EngineInput,
+  dDay: DateString,
+  evaluate: (a: WhatIfAssumption) => Evaluation,
+): RecoveryOption | null {
+  const earliest = addDays(input.today, 1);
+
+  // 요구 금액은 작을수록 좋지만, 너무 작으면 협상 카드가 안 된다(RECOVERY_TARGET_DAYS 주석).
+  const chosen = pickFromLadder(ADVANCE_AMOUNTS, (amount) =>
+    evaluate(advanceAssumption(amount, earliest)).dayDelta);
+  if (chosen === null) return null;
+  const chosenAmount = chosen.picked;
+
+  // (나) 최대 유예: 그 금액으로 아직 효과가 있는 가장 늦은 날짜.
+  const latestDate = findLatestEffectiveDate(chosenAmount, earliest, dDay, evaluate);
+  const finalDate = latestDate ?? earliest;
+  const evaluation = evaluate(advanceAssumption(chosenAmount, finalDate));
+
+  return {
+    assumption: advanceAssumption(chosenAmount, finalDate),
+    dayDelta: evaluation.dayDelta,
+    dDayBefore: evaluation.dDayBefore,
+    dDayAfter: evaluation.dDayAfter,
+    latestDate: finalDate,
+    rationale: [
+      `${formatWon(chosenAmount)}이 ${finalDate}까지 들어오면 D-day가 ${evaluation.dDayBefore}에서 ${evaluation.dDayAfter}로 ${evaluation.dayDelta}일 늦춰져요.`,
+      `${finalDate}보다 늦어지면 이 금액으로는 D-day가 움직이지 않아요.`,
+      ...(chosen.reachedTarget
+        ? []
+        : [`이 금액으로 벌 수 있는 건 ${evaluation.dayDelta}일까지예요. 더 필요하면 금액을 올려야 해요.`]),
+    ],
+    effortLabel: "거래처에 선금 요청",
+  };
+}
+
+function advanceAssumption(amount: Won, date: DateString): WhatIfAssumption {
+  return { type: "advance_payment", label: `선금 ${formatWon(amount)}`, amount, date };
+}
+
+/**
+ * 같은 금액이면 일찍 들어올수록 D-day에 유리하다(늦게 들어온 돈은 그 전에 이미
+ * 잔액이 0을 지났으면 아무 효과가 없다). 즉 dayDelta는 날짜에 대해 비증가라
+ * 이분 탐색으로 "효과가 있는 가장 늦은 날"을 찾을 수 있다. 선형 스캔이면 최대
+ * 90회인데 이분 탐색은 7회면 끝난다.
+ */
+function findLatestEffectiveDate(
+  amount: Won,
+  earliest: DateString,
+  dDay: DateString,
+  evaluate: (a: WhatIfAssumption) => Evaluation,
+): DateString | null {
+  let lo = 0;                          // earliest 기준 오프셋. 여기는 효과 있음이 보장됨
+  let hi = diffDays(earliest, dDay);   // D-day 당일까지만 본다. 그 뒤 입금은 의미가 없다
+  if (hi < 0) return null;
+
+  let best: DateString | null = null;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const date = addDays(earliest, mid);
+    if (evaluate(advanceAssumption(amount, date)).dayDelta > 0) {
+      best = date;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return best;
+}
+
+// ── 2. 유출 연기 ───────────────────────────────────────────
+
+function findDelayOutflow(
+  input: EngineInput,
+  dDay: DateString,
+  evaluate: (a: WhatIfAssumption) => Evaluation,
+): RecoveryOption | null {
+  // D-day 전에 빠져나가는 유출만 병목이 될 수 있다. 그중 가장 큰 것을 고른다.
+  // baseline에 이미 포함된 항목은 개별 차감 대상이 아니므로 제외한다(기획서 9-3).
+  const candidates = input.outflows
+    .filter((o) => !o.includedInBaseline)
+    .filter((o) => o.dueDate >= input.today && o.dueDate <= dDay)
+    .sort((a, b) => b.amount - a.amount || a.id.localeCompare(b.id));
+
+  const target = candidates[0];
+  if (!target) return null;
+
+  const chosen = pickFromLadder(DELAY_DAYS, (days) =>
+    evaluate(delayAssumption(target, days)).dayDelta);
+  if (chosen === null) return null;
+
+  {
+    const days = chosen.picked;
+    const newDate = addDays(target.dueDate, days);
+    const assumption = delayAssumption(target, days);
+    const evaluation = evaluate(assumption);
+    {
+      return {
+        assumption,
+        dayDelta: evaluation.dayDelta,
+        dDayBefore: evaluation.dDayBefore,
+        dDayAfter: evaluation.dDayAfter,
+        latestDate: null,
+        rationale: [
+          `${target.name} ${formatWon(target.amount)}을 ${target.dueDate}에서 ${newDate}로 미루면 D-day가 ${evaluation.dayDelta}일 늦춰져요.`,
+          `${days}일보다 짧게 미루면 D-day가 움직이지 않아요.`,
+        ],
+        effortLabel: `${target.name} 결제일 변경 요청`,
+      };
+    }
+  }
+}
+
+function delayAssumption(
+  target: { id: string; name: string; dueDate: DateString },
+  days: number,
+): WhatIfAssumption {
+  return {
+    type: "delay_outflow",
+    label: `${target.name} ${days}일 연기`,
+    outflowId: target.id,
+    newDate: addDays(target.dueDate, days),
+  };
+}
+
+// ── 3. 지출 절감 ───────────────────────────────────────────
+
+function findReduceSpending(
+  evaluate: (a: WhatIfAssumption) => Evaluation,
+): RecoveryOption | null {
+  const chosen = pickFromLadder(REDUCE_AMOUNTS, (amount) =>
+    evaluate(reduceAssumption(amount)).dayDelta);
+  if (chosen === null) return null;
+
+  {
+    const monthlyReduction = chosen.picked;
+    const assumption = reduceAssumption(monthlyReduction);
+    const evaluation = evaluate(assumption);
+    {
+      return {
+        assumption,
+        dayDelta: evaluation.dayDelta,
+        dDayBefore: evaluation.dDayBefore,
+        dDayAfter: evaluation.dDayAfter,
+        latestDate: null,
+        rationale: [
+          `월 지출을 ${formatWon(monthlyReduction)} 줄이면 D-day가 ${evaluation.dayDelta}일 늦춰져요.`,
+          `하루로 치면 ${formatWon(Math.floor(monthlyReduction / MVP_POLICY.fixedOutflowDailyDivisor))} 수준이에요.`,
+        ],
+        effortLabel: "이번 달 지출 줄이기",
+      };
+    }
+  }
+}
+
+function reduceAssumption(monthlyReduction: Won): WhatIfAssumption {
+  return {
+    type: "reduce_spending",
+    label: `월 지출 ${formatWon(monthlyReduction)} 절감`,
+    monthlyReduction,
+  };
+}
+
+// ── 표시 보조 ──────────────────────────────────────────────
+
+function formatWon(amount: Won): string {
+  return `${amount.toLocaleString("ko-KR")}원`;
+}
