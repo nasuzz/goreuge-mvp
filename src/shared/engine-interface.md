@@ -8,7 +8,7 @@
 | 대상 | 용도 | 담당 |
 | --- | --- | --- |
 | LLM API | 계약 문장 → 구조화 JSON | **B** |
-| 공휴일 API | 예정입금일 주말·공휴일 보정 | A — **P1, MVP는 OFF** |
+| 공휴일 API | 예정입금일 주말·공휴일 보정 | A — **P1, MVP는 OFF** (사전 캐시 데이터로 대체, 이슈 #57) |
 
 그 외 외부 API는 없다. **A가 만드는 건 전부 우리 코드 안의 순수 계산 함수다.**
 
@@ -96,10 +96,22 @@ function calculateExpectedDate(
 `expectedDateSource: "manual"`이라는 탈출구가 있어서 6개로 충분하다.
 이 필드가 없으면 `UNKNOWN` 계약이 영원히 D-day에 못 들어간다.
 
-**주말·공휴일 보정 (P1, 기본 OFF)**
+**주말·공휴일 보정 (P1, 기본 OFF) — 이슈 #57에서 구현, 기본값은 여전히 OFF**
 예정입금일이 토·일·공휴일이면 **다음 영업일**로 이동 (돈이 늦게 들어온다고 보는 쪽이 보수적).
 > 데모 계약이 실제로 걸린다: 완료일 2026-09-03 + 익월 말일 = **2026-10-31 (토)**.
 > MVP는 OFF라 10/31 그대로 쓴다. 켜면 11/2(월).
+
+`calculateExpectedDate(contract, { adjustWeekendHoliday: true })`로 옵션을 켤 수 있다.
+기본값(`adjustWeekendHoliday` 생략 또는 `false`)은 기존과 동일하게 계산된 날짜를 그대로 반환한다.
+공휴일 판정은 `shared/holidays.ts`의 사전 캐시(`KR_HOLIDAYS_CACHE`)를 쓴다 — 실제 공휴일 API 연동 전까지의 대체 데이터다.
+ON일 때의 기대값은 `test/expected-holiday-verify.ts`에 별도로 고정돼 있고, `test/expected-verify.ts`의 기존 OFF 기준 검증값은 그대로 통과한다.
+
+**캐시 커버 연도 밖이면 보정하지 않는다 (PR #63 리뷰 반영, lyoonji)**
+`KR_HOLIDAYS_CACHE`는 2026년만 실제로 채워져 있다(2028-01-01은 윤년 테스트용 단발 항목).
+2027처럼 캐시에 없는 연도에서 주말 보정만 적용하면 "삼일절(3/1)인데 평일이라 그대로 반환"처럼
+아무 신호 없이 틀린 날짜가 나온다. `KR_HOLIDAYS_COVERED_YEARS`(현재 `{2026}`)에 없는 연도로는
+아예 보정하지 않고 원래 계산된 날짜를 그대로 반환한다 — 연휴 보정 도중 커버 밖 연도로 넘어가는
+경우도 그 지점에서 멈춘다. "보정 안 함"이 "공휴일을 놓친 채 틀리게 보정함"보다 낫다는 판단이다.
 
 ---
 
@@ -339,27 +351,86 @@ function compareWhatIf(
 
 ---
 
-### 3-9. 입금 확인 & 공제율 역산 (P1)
+### 3-8-1. 조합 가정 비교 [구현 완료, 이슈 #50 / PR #58]
 
 ```ts
-function confirmPayment(contract: Contract, input: PaymentConfirmInput): Contract;
+interface CombinedWhatIfResult {
+  assumptions: WhatIfAssumption[];
+  dDayBefore: DateString | null;
+  dDayAfter: DateString | null;
+  dayDelta: number;
+}
+
+function compareWhatIfCombined(
+  input: EngineInput, assumptions: WhatIfAssumption[], now: DateTimeString,
+): CombinedWhatIfResult;
 ```
+
+`compareWhatIf`는 가정마다 원본의 깨끗한 복사본에서 독립적으로 계산하기 때문에
+"여러 가정을 동시에 적용하면 며칠인가"를 낼 수 없다. D-day는 "잔액이 최초로
+0 이하가 되는 날"이라 두 조치의 `dayDelta`를 단순히 더할 수 없기 때문이다 —
+실측(이슈 #50):
+
+```
+선금 1,500,000원 단독 : 09-14 -> 10-08  (+24일)
+카드 결제 연기 단독    : 09-14 -> 09-20  (+6일)
+둘 다 적용            : 09-14 -> 10-08  (+24일, 30일이 아니다)
+```
+
+그래서 `compareWhatIfCombined`는 여러 가정을 **같은 복사본에 순차 적용**한
+뒤 한 번만 재시뮬레이션한다.
+
+반환 타입이 `WhatIfResult`가 아니라 별도 `CombinedWhatIfResult`인 이유:
+`WhatIfResult.assumption`은 단수라 조합을 담으면 "N개 중 하나"만 실려 사실과
+달라진다. 가정 목록(`assumptions: WhatIfAssumption[]`)을 그대로 싣는 편이
+정직하다(PR #58 리뷰에서 A가 동의함).
+
+최대 개수 제한(`MVP_POLICY.maxWhatIfAssumptions`)은 `compareWhatIf`와 동일하게
+적용된다.
+
+---
+
+### 3-9. 입금 확인 & 공제율 역산 (P1) [구현 완료, 이슈 #55]
+
+```ts
+function confirmPayment(contract: Contract, input: PaymentConfirmInput, now: DateTimeString): Contract;
+```
+
+> **[이슈 #55, 시그니처 정정]** 구현하면서 원래 시그니처(`now` 없음)로는
+> `statusUpdatedAt`/`updatedAt`을 채우려고 함수 내부에서 `Date.now()`를 불러야
+> 해서, 이 문서 1절과 `statusTransition.ts`의 "엔진은 Date.now()를 직접
+> 호출하지 않는다" 원칙과 충돌했다. 다른 모든 전이 함수(`markContractAsRisk`
+> 등)와 같은 관례로 `now`를 호출부 주입 인자로 추가했다.
 
 ```
 actualRate = (grossAmount - actualNetAmount) / grossAmount
 ```
 
+`actual_rate` 컬럼이 `numeric(5,4)`라(이슈 #16의 `confirmed_expected_rate`
+원단위 오차와 같은 문제) 소수 4자리로 반올림해서 반환한다.
+
 - `classificationStatus → "actual_confirmed"`, `status → "completed"`
-- `expectedNetAmount`는 남겨두되 화면은 실제값 우선 표시
-- `clients` 지연 통계 재계산 트리거
+- `expectedNetAmount`는 남겨두되 화면은 실제값 우선 표시 (기존 `calculateExpectedNetAmount`가
+  이미 `actualNetAmount` 최우선이라 별도 처리 불필요 — `test/payment-confirm-verify.ts`에서
+  통합 확인함)
+- `clients` 지연 통계 재계산은 이 함수의 책임이 아니다. `Client` 전체 이력이 필요한
+  별도 집계라 `recalculateClientStats`(3-10)로 분리돼 있다 — 호출부(API 라우트)가
+  `confirmPayment` 다음에 그쪽도 호출해야 한다.
+- `actualNetAmount`가 0 이상 `grossAmount` 이하의 정수가 아니면 throw (`chk_actual_pair`
+  범위 제약과 대응)
 
 ---
 
-### 3-10. 거래처 지연 통계 갱신
+### 3-10. 거래처 지연 통계 갱신 [구현 완료, 이슈 #55]
 
 ```ts
 function recalculateClientStats(client: Client, completedContracts: Contract[]): Client;
 ```
+
+`completedContracts`는 호출부가 이미 완료 상태로 필터링해 넘긴다는 전제다. `completedCount`는
+배열 길이 그대로 반영하고, `medianDelayDays`/`p90DelayDays`는 그중 `expectedDate`·`actualDate`가
+모두 있어 지연일을 계산할 수 있는 건이 `clientHistoryMinCount`(3) 미만이면 `completedCount`와
+무관하게 `null`이다. p90은 보간 없이 최근접 순위 방식(`ceil(n*0.9)`번째 값)을 쓴다.
 
 ```
 지연일 = actualDate - expectedDate (음수면 0으로 clamp)
@@ -416,6 +487,15 @@ function applySavingsCheck(
 체크 완료:  plannedAmount 감소, reservedAmount 증가, 추가 차감 없음
 구매 완료:  reservedAmount 감소, 실제 구매 유출 증가, 동일 금액이면 D-day 변화 없음
 ```
+
+**[PR #64 리뷰 반영, lyoonji]**
+- 위 "적립 상태 전이"는 `Saving`의 금액 필드(`plannedAmount`/`reservedAmount`/`spentAmount`)
+  이야기다. `Saving.status`(`SavingsStatus` enum)는 이 절 어디에도 전이 규칙이 없다 —
+  `applySavingsCheck`는 `status`를 건드리지 않는다. 화면은 `status`가 아니라
+  `reservedAmount`/`plannedAmount` 값으로 적립 중/완료 여부를 판단해야 한다.
+- "구매 완료" 전이(`reservedAmount` 감소, `spentAmount` 증가)는 **이슈 #56 범위 밖**이다
+  — "A가 P1에서 추가로 할 일" 목록(아래)에 `calculateWishPlan`·`applySavingsCheck`만
+  있고 이 전이는 없다. 필요해지면 별도 이슈로 뺀다.
 
 **A가 P1에서 추가로 할 일**
 1. `simulationStartBalance`에 `reservedAmount` 실제 반영 (공식은 이미 있음)

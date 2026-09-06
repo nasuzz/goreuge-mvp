@@ -14,6 +14,8 @@ import { rebuildAIConfirmationViewModel } from "@/ai/confirmation-flow";
 import { recomputeMissingFields } from "@/ai/review-rules";
 import type { AIConfirmationViewModel } from "@/ai/confirmation-flow";
 import type { CandidateField } from "@/ai/review-rules";
+import { RISK_LABEL } from "@/ai/contract-risk";
+import type { ContractRiskSignal } from "@/ai/contract-risk";
 import { Badge } from "@/components/ui";
 import { TERM_LABEL } from "@/lib/contract-view";
 import type { AIContractCandidate, DateString } from "@/shared/types";
@@ -51,10 +53,13 @@ const NEEDS_MANUAL_DATE: Array<SettlementTerm | null> = [null, "UNKNOWN"];
 
 export function AIConfirmModal({
   initial,
+  riskSignals = [],
   onClose,
   onApply,
 }: {
   initial: AIConfirmationViewModel;
+  /** [#49] 계약 문장의 구조적 위험. 없으면 이 영역을 아예 그리지 않는다 */
+  riskSignals?: ContractRiskSignal[];
   onClose: () => void;
   onApply: (candidate: AIContractCandidate, manualExpectedDate: DateString | null) => void;
 }) {
@@ -297,6 +302,33 @@ export function AIConfirmModal({
             </span>
           </span>
         </label>
+
+        {/* [#49] 값이 아니라 계약 문장의 구조를 보고 알려준다. 저장은 막지 않는다. */}
+        {riskSignals.length > 0 && (
+          <section className="mt-4 rounded-xl border border-line p-3">
+            <h3 className="text-sm font-semibold">등록 전에 확인해 보세요</h3>
+            <p className="mt-0.5 text-xs text-muted">
+              저장을 막지는 않아요. 알고 등록하시라고 알려드립니다.
+            </p>
+            <ul className="mt-2 flex flex-col gap-2.5">
+              {riskSignals.map((signal) => (
+                <li key={signal.kind}>
+                  <div className="flex items-center gap-1.5">
+                    <Badge tone={signal.severity === "warning" ? "caution" : "neutral"}>
+                      {signal.severity === "warning" ? "확인 필요" : "참고"}
+                    </Badge>
+                    <span className="text-sm font-medium">{RISK_LABEL[signal.kind]}</span>
+                  </div>
+                  {/* 근거는 원문에 실제로 있는 문장만 온다(환각 가드) */}
+                  <p className="mt-1 rounded-lg bg-surface-muted px-2.5 py-1.5 text-xs text-muted">
+                    “{signal.quote}”
+                  </p>
+                  <p className="mt-1 text-xs">물어볼 것 · {signal.suggestedQuestion}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {!gate.canSave && gate.errors.length > 0 && (
           <ul role="alert" className="mt-3 rounded-xl bg-danger-bg px-3 py-2.5 text-xs text-danger">

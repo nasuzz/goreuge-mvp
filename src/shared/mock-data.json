@@ -144,7 +144,7 @@
       "updatedAt": "2026-09-01T09:00:00+09:00"
     },
     {
-      "_case": "지연 / 데모 1:35 클라이맥스 대상. 이 건을 위험으로 지정하면 기준 D-day가 16일 앞당겨진다",
+      "_case": "지연 / 데모 1:35 클라이맥스 대상. 이 건을 위험으로 지정하면 기준 D-day가 16일 앞당겨진다. [이슈 #69 수정] expectedDate가 08-31이어야 하는데(NEXT_MONTH_END 공식값) 08-22로 잘못 저장돼 있던 선재 버그를 정정함 — expectedDateSource가 calculated인 값은 calculateExpectedDate() 결과와 항상 같아야 한다([확정 D1-a]).",
       "id": "contract-002",
       "clientId": "client-002",
       "grossAmount": 1200000,
@@ -152,7 +152,7 @@
       "invoiceDate": null,
       "settlementTerm": "NEXT_MONTH_END",
       "settlementDay": null,
-      "expectedDate": "2026-08-22",
+      "expectedDate": "2026-08-31",
       "expectedDateSource": "calculated",
       "actualDate": null,
       "incomeType": "business_personal_service",
@@ -382,6 +382,7 @@
       "status": "waiting"
     },
     {
+      "_case": "[PR #64 리뷰 확인, lyoonji] weeklyAmount 50,000원은 이번 주 가용금액(15,100원) x 0.30(4,530원)보다 커서 calculateWishPlan.exceedsWeeklyWarning이 항상 true다. 계산은 규격 그대로 정확하고, 화면 첫 진입부터 경고가 뜨는 건 실수가 아니라 의도된 데모 포인트로 두기로 함 — '가용금액에 비해 무리한 적립을 앱이 잡아준다'. 경고 없는 기본값을 원하면 weeklyAmount를 4,530원 이하로 낮출 것.",
       "id": "saving-002",
       "kind": "wish",
       "name": "모니터 교체",

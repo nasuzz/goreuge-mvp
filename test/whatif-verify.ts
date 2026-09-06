@@ -88,11 +88,12 @@ console.log("── recalculateContractStatus: 예정일을 오늘 이전으로 
 console.log("── recalculateContractStatus: delayed 상태, 60일 이상 경과 (delayed → risk) ──");
 {
   const c2 = MOCK.contracts.find((c) => c.id === "contract-002")!;
-  // contract-002 expectedDate = 2026-08-22, today = 2026-09-01 → 10일 경과, 아직 60일 미만
+  // [이슈 #69 수정] contract-002 expectedDate = 2026-08-31(이전엔 08-22로 잘못 저장돼 있었음),
+  // today = 2026-09-01 → 1일 경과, 아직 60일 미만
   const stillDelayed = recalculateContractStatus(c2, MOCK_ENGINE_INPUT.today, NOW);
   check("아직 60일 미만이면 delayed 유지", stillDelayed.status, "delayed");
 
-  const farFuture = "2026-11-01"; // 2026-08-22 대비 71일 경과
+  const farFuture = "2026-11-01"; // 2026-08-31 대비 62일 경과
   const becameRisk = recalculateContractStatus(c2, farFuture, NOW_FAR_FUTURE);
   check("60일 이상 경과 시 delayed → risk", becameRisk.status, "risk");
   check("자동 전이의 statusSource는 system", becameRisk.statusSource, "system");

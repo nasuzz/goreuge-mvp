@@ -13,6 +13,7 @@ import type { IncomeType, SettlementTerm } from "@/shared/enums";
 import type { AIContractCandidate } from "@/shared/types";
 import type { AIConfirmationViewModel } from "@/ai/confirmation-flow";
 import { AIConfirmModal } from "@/components/ai-confirm-modal";
+import type { ContractRiskSignal, RiskDetectionResult } from "@/ai/contract-risk";
 
 const TERMS: SettlementTerm[] = [
   "ON_COMPLETION",
@@ -62,6 +63,7 @@ export default function NewContractPage() {
   const [aiError, setAiError] = useState<string | null>(null);
   const [candidateModel, setCandidateModel] = useState<AIConfirmationViewModel | null>(null);
   const [applied, setApplied] = useState(false);
+  const [riskSignals, setRiskSignals] = useState<ContractRiskSignal[]>([]);
 
   async function requestCandidate() {
     setAiLoading(true);
@@ -80,6 +82,17 @@ export default function NewContractPage() {
         return;
       }
       setCandidateModel(data as AIConfirmationViewModel);
+
+      // [#49] 위험 신호는 별도 라우트라 실패해도 후보 추출을 막지 않는다.
+      // 모달은 이미 떠 있고, 신호가 오면 그 자리에 채워진다.
+      fetch("/api/ai/contract-risk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: aiText, referenceDate: today }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((risk: RiskDetectionResult | null) => setRiskSignals(risk?.signals ?? []))
+        .catch(() => setRiskSignals([]));
     } catch {
       setAiError("분석 요청을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -467,6 +480,7 @@ export default function NewContractPage() {
       {candidateModel && (
         <AIConfirmModal
           initial={candidateModel}
+          riskSignals={riskSignals}
           onClose={() => setCandidateModel(null)}
           onApply={applyCandidate}
         />
