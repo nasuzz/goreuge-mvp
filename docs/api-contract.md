@@ -18,6 +18,8 @@
 ```
 
 출력은 `AIContractCandidate`를 사용합니다. 사용자 확인 전에는 계약을 저장하지 않습니다.
+`payerStatedNetAmountCandidate`는 지급처 안내 후보일 뿐 확정값이 아닙니다. C는 사용자가
+확인·수정한 경우에만 계약 저장 요청의 `payerStatedNetAmount`로 이름을 바꿔 전달합니다.
 
 ## 계약 저장
 
@@ -53,4 +55,3 @@
 Mock 수정 필요 여부:
 적용 예정 시점:
 ```
-

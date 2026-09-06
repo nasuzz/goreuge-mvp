@@ -108,6 +108,7 @@
       "id": "contract-001",
       "clientId": "client-001",
       "grossAmount": 2400000,
+      "payerStatedNetAmountCandidate": null,
       "completionDate": "2026-09-03",
       "invoiceDate": null,
       "settlementTerm": "NEXT_MONTH_END",
@@ -394,6 +395,7 @@
       "confidence": {
         "clientName": 0.0,
         "grossAmount": 0.98,
+        "payerStatedNetAmountCandidate": 1.0,
         "completionDate": 0.96,
         "settlementTerm": 0.91,
         "incomeTypeCandidate": 0.31
@@ -408,6 +410,7 @@
       "_input": "K스튜디오 홍보영상 건 320만원으로 진행하시죠. 정산은 납품 후 30일이요.",
       "clientName": "K스튜디오",
       "grossAmount": 3200000,
+      "payerStatedNetAmountCandidate": null,
       "completionDate": null,
       "settlementTerm": "NET_DAYS",
       "settlementDay": 30,
@@ -415,6 +418,7 @@
       "confidence": {
         "clientName": 0.94,
         "grossAmount": 0.97,
+        "payerStatedNetAmountCandidate": 1.0,
         "completionDate": 0.0,
         "settlementTerm": 0.89,
         "incomeTypeCandidate": 0.62
@@ -429,6 +433,7 @@
       "_input": "그 건은 250만원에 하시죠. 정산은 나중에 이야기해요.",
       "clientName": null,
       "grossAmount": 2500000,
+      "payerStatedNetAmountCandidate": null,
       "completionDate": null,
       "settlementTerm": "UNKNOWN",
       "settlementDay": null,
@@ -436,6 +441,7 @@
       "confidence": {
         "clientName": 0.0,
         "grossAmount": 0.95,
+        "payerStatedNetAmountCandidate": 1.0,
         "completionDate": 0.0,
         "settlementTerm": 0.12,
         "incomeTypeCandidate": 0.2
