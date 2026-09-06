@@ -184,7 +184,7 @@ function findAdvancePayment(
     dDayAfter: evaluation.dDayAfter,
     latestDate: finalDate,
     rationale: [
-      `${formatWon(chosenAmount)}이 ${finalDate}까지 들어오면 D-day가 ${evaluation.dDayBefore}에서 ${evaluation.dDayAfter}로 ${evaluation.dayDelta}일 늦춰져요.`,
+      `${formatWon(chosenAmount)}이 ${finalDate}까지 들어오면 ${describeAfter(evaluation.dDayAfter, evaluation.dayDelta)}.`,
       `${finalDate}보다 늦어지면 이 금액으로는 D-day가 움직이지 않아요.`,
       ...(chosen.reachedTarget
         ? []
@@ -235,19 +235,41 @@ function findDelayOutflow(
   dDay: DateString,
   evaluate: (a: WhatIfAssumption) => Evaluation,
 ): RecoveryOption | null {
-  // D-day 전에 빠져나가는 유출만 병목이 될 수 있다. 그중 가장 큰 것을 고른다.
+  // D-day 전에 빠져나가는 유출만 병목이 될 수 있다.
   // baseline에 이미 포함된 항목은 개별 차감 대상이 아니므로 제외한다(기획서 9-3).
+  //
+  // [PR #58 리뷰, hsoo23] 예전에는 금액이 가장 큰 유출 하나만 평가했는데,
+  // "가장 큰 유출"이 항상 D-day를 만드는 병목은 아니다. 초반 큰 지출은 며칠
+  // 미뤄도 여전히 D-day 앞에서 빠져나가 delta가 0이고, 정작 D-day 당일의 작은
+  // 지출을 미뤄야 D-day가 밀리는 현금흐름이 있다. 그래서 후보 전체를 평가한다.
   const candidates = input.outflows
     .filter((o) => !o.includedInBaseline)
     .filter((o) => o.dueDate >= input.today && o.dueDate <= dDay)
     .sort((a, b) => b.amount - a.amount || a.id.localeCompare(b.id));
 
-  const target = candidates[0];
-  if (!target) return null;
+  // 후보마다 "효과가 나는 최소 연기일"을 구한 뒤 그중 하나를 고른다.
+  const evaluated = candidates
+    .map((outflow) => {
+      const picked = pickFromLadder(DELAY_DAYS, (days) =>
+        evaluate(delayAssumption(outflow, days)).dayDelta);
+      return picked === null ? null : { outflow, ...picked };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
-  const chosen = pickFromLadder(DELAY_DAYS, (days) =>
-    evaluate(delayAssumption(target, days)).dayDelta);
-  if (chosen === null) return null;
+  if (evaluated.length === 0) return null;
+
+  // 선택 규칙: (1) 목표 일수를 넘기는 것 우선, (2) 연기 일수가 짧을수록 좋다
+  // — 거래처·카드사에 요구하는 폭이 작다, (3) 그래도 같으면 효과가 큰 쪽,
+  // (4) 마지막은 id로 고정해 결정성을 보장한다.
+  evaluated.sort((a, b) =>
+    Number(b.reachedTarget) - Number(a.reachedTarget)
+    || a.picked - b.picked
+    || b.delta - a.delta
+    || a.outflow.id.localeCompare(b.outflow.id));
+
+  const best = evaluated[0];
+  const target = best.outflow;
+  const chosen = best;
 
   {
     const days = chosen.picked;
@@ -262,7 +284,7 @@ function findDelayOutflow(
         dDayAfter: evaluation.dDayAfter,
         latestDate: null,
         rationale: [
-          `${target.name} ${formatWon(target.amount)}을 ${target.dueDate}에서 ${newDate}로 미루면 D-day가 ${evaluation.dayDelta}일 늦춰져요.`,
+          `${target.name} ${formatWon(target.amount)}을 ${target.dueDate}에서 ${newDate}로 미루면 ${describeAfter(evaluation.dDayAfter, evaluation.dayDelta)}.`,
           `${days}일보다 짧게 미루면 D-day가 움직이지 않아요.`,
         ],
         effortLabel: `${target.name} 결제일 변경 요청`,
@@ -304,7 +326,7 @@ function findReduceSpending(
         dDayAfter: evaluation.dDayAfter,
         latestDate: null,
         rationale: [
-          `월 지출을 ${formatWon(monthlyReduction)} 줄이면 D-day가 ${evaluation.dayDelta}일 늦춰져요.`,
+          `월 지출을 ${formatWon(monthlyReduction)} 줄이면 ${describeAfter(evaluation.dDayAfter, evaluation.dayDelta)}.`,
           `하루로 치면 ${formatWon(Math.floor(monthlyReduction / MVP_POLICY.fixedOutflowDailyDivisor))} 수준이에요.`,
         ],
         effortLabel: "이번 달 지출 줄이기",
@@ -322,6 +344,19 @@ function reduceAssumption(monthlyReduction: Won): WhatIfAssumption {
 }
 
 // ── 표시 보조 ──────────────────────────────────────────────
+
+/**
+ * 가정 덕분에 90일 안에서 D-day가 사라지는 경우가 있다(computeDayDelta가 정상
+ * 케이스로 처리한다). 이때 dDayAfter는 null이라 그대로 문자열에 넣으면
+ * "D-day가 2026-10-05에서 null로 56일 늦춰져요"가 나온다.
+ * formatWhatIfMessage와 같은 취지로 분기한다. [PR #58 리뷰, hsoo23]
+ */
+function describeAfter(dDayAfter: DateString | null, dayDelta: number): string {
+  if (dDayAfter === null) {
+    return `${MVP_POLICY.simulationHorizonDays}일 안에서는 D-day가 사라져요`;
+  }
+  return `D-day가 ${dDayAfter}로 ${dayDelta}일 늦춰져요`;
+}
 
 function formatWon(amount: Won): string {
   return `${amount.toLocaleString("ko-KR")}원`;

@@ -12,6 +12,7 @@ import { MOCK_ENGINE_INPUT } from "../src/shared/mock-data";
 import {
   compareWhatIf, compareWhatIfCombined, findRecovery, markContractAsRisk, runScenario,
 } from "../src/engine/index";
+import { addDays } from "../src/engine/scenarioDate";
 import type { EngineInput, WhatIfAssumption } from "../src/shared/types";
 
 const NOW = "2026-09-01T09:00:00+09:00";
@@ -166,11 +167,92 @@ for (const [name, input] of [["기준", BASE], ["위험 전환 후", RISKY]] as 
   }
 }
 
-console.log("\n── 5. 결정성 ──────────────────────────────────────");
+console.log("\n── 5. 합성 입력 — PR #58 리뷰(hsoo23) 지적 2건 ─────");
+
+// mock 스냅샷만으로는 아래 두 케이스가 안 나온다. 합성 현금흐름으로 고정한다.
+//   - 금액이 가장 큰 유출이 병목이 아닌 경우 (1위만 보면 유출 연기 카드를 통째로 놓친다)
+//   - 가정 덕분에 90일 내 D-day가 사라지는 경우 (dDayAfter가 null)
+const SYNTHETIC: EngineInput = {
+  today: "2026-09-01",
+  user: {
+    id: "synthetic-user",
+    totalBalance: 2_000_000,
+    monthlyFixedOutflow: 0, // 일일 베이스라인 차감을 0으로 둬야 아래 두 유출만 남는다
+    safetyBuffer: 0,
+    taxReserveRate: 0,
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+  contracts: [],
+  clients: [],
+  savings: [],
+  outflows: [
+    // 금액은 크지만 D-day(10/5)보다 한참 앞이라 30일을 미뤄도 여전히 앞에서 빠진다.
+    {
+      id: "outflow-big", kind: "기타", name: "초기 큰 지출", amount: 1_500_000,
+      dueDate: "2026-09-02", recurrence: "once", includedInBaseline: false,
+    },
+    // 금액은 작지만 이게 D-day를 만드는 병목이다.
+    {
+      id: "outflow-small", kind: "기타", name: "후반 작은 지출", amount: 600_000,
+      dueDate: "2026-10-05", recurrence: "once", includedInBaseline: false,
+    },
+  ],
+};
+
+check("합성: baseline D-day", runScenario(SYNTHETIC, "baseline").dDay, "2026-10-05");
+
+// 금액 1위(초기 큰 지출)는 사다리 전체를 훑어도 D-day를 못 움직인다.
+check(
+  "합성: 초기 큰 지출은 7/14/21/30일 어느 쪽으로 미뤄도 +0일",
+  [7, 14, 21, 30].map((days) => delta(SYNTHETIC, {
+    type: "delay_outflow", label: "초기 큰 지출", outflowId: "outflow-big",
+    newDate: addDays("2026-09-02", days),
+  })),
+  [0, 0, 0, 0],
+);
+
+const syntheticFinding = findRecovery(SYNTHETIC, NOW);
+const syntheticDelay = syntheticFinding.options.find((o) => o.assumption.type === "delay_outflow");
+
+check("합성: 유출 연기 카드를 놓치지 않는다", syntheticDelay !== undefined, true);
+check(
+  "합성: 금액 1위가 아니라 병목인 작은 유출을 고른다",
+  syntheticDelay && syntheticDelay.assumption.type === "delay_outflow"
+    ? { outflowId: syntheticDelay.assumption.outflowId, dayDelta: syntheticDelay.dayDelta }
+    : null,
+  { outflowId: "outflow-small", dayDelta: 7 },
+);
+
+// D-day가 사라지는 경우 rationale에 "null"이 새면 안 된다.
+const syntheticAdvance = syntheticFinding.options.find((o) => o.assumption.type === "advance_payment");
+// dDayAfter가 null인 것 자체가 확인 대상이므로 ?? 로 기본값을 씌우면 안 된다.
+check(
+  "합성: 선금 가정이 D-day를 90일 밖으로 밀어낸다",
+  syntheticAdvance === undefined ? "선금 옵션 없음" : syntheticAdvance.dDayAfter,
+  null,
+);
+check(
+  "합성: 어떤 문구에도 null이 새지 않는다",
+  syntheticFinding.options.some((o) => o.rationale.some((line) => line.includes("null"))),
+  false,
+);
+check(
+  "합성: D-day가 사라지면 그렇게 말한다",
+  syntheticAdvance?.rationale[0],
+  "200,000원이 2026-10-05까지 들어오면 90일 안에서는 D-day가 사라져요.",
+);
+
+console.log("\n── 6. 결정성 ──────────────────────────────────────");
 check(
   "같은 입력이면 항상 같은 결과",
   JSON.stringify(findRecovery(RISKY, NOW)),
   JSON.stringify(findRecovery(RISKY, NOW)),
+);
+check(
+  "합성 입력도 결정적",
+  JSON.stringify(findRecovery(SYNTHETIC, NOW)),
+  JSON.stringify(findRecovery(SYNTHETIC, NOW)),
 );
 
 console.log("\n" + (failCount === 0 ? `✅ findRecovery 회귀 전부 통과 (${failCount}건 실패)` : `❌ ${failCount}건 실패`));
