@@ -149,9 +149,22 @@ export function runScenario(input: EngineInput, scenario: Scenario): CashflowRes
 
     const inflow = inflowByDate[date] ?? 0;
     const fixedOutflow = outflowByDate[date] ?? 0;
-    // [이슈 #68, 2026-09-07 확정] plannedAmount를 여기서 반영하려 했으나
-    // Saving에 그 "예정일"을 담을 필드가 없어 보류로 확정했다(engine-interface.md
-    // 3-11 참고). 계속 0으로 둔다 — plannedAmount는 화면 표시 전용이다.
+    // [이슈 #68, 2026-09-07 확정] plannedAmount는 여기서 반영하지 않는다. 계속 0이다.
+    //
+    // engine-interface.md 3-11 "A가 P1에서 추가로 할 일" 2번은 plannedAmount를
+    // "예정일의 미래 유출"로 반영하라고 하지만, shared/types.ts의 Saving에 그 예정일을
+    // 담을 필드가 없다(db/schema.sql의 savings 테이블도 마찬가지). 날짜 없이 엔진이
+    // 임의로 정해 차감하면 근거 없는 날짜에 D-day가 나빠진다.
+    //
+    // weeklyAmount로 유도하는 우회도 성립하지 않는다 — mock의 두 케이스가 각각
+    // tax(weekly=null), wish(planned=0)라 어느 쪽도 예정일을 만들 수 없다(PR #64 확인).
+    // 필드 추가는 공용 타입 변경 절차(shared-spec.md 271) 대상이고 사용자 입력 화면도
+    // 함께 필요해서, P1 범위에서는 보류로 확정했다.
+    //
+    // 3-11이 명시한 데모 비트(세금 준비금 288,000원 체크 -> D-day 09-30 -> 09-23)는
+    // applySavingsCheck가 plannedAmount -> reservedAmount로 옮기는 것만으로 재현된다
+    // (computeSimulationStartBalance가 reservedAmount를 즉시 반영하므로).
+    // 즉 plannedAmount는 화면 표시 전용이고, 시뮬레이션에는 reservedAmount만 들어간다.
     const newSavingsOutflow = 0;
 
     runningBalance = runningBalance + inflow - fixedOutflow - dailyBaselineRaw - newSavingsOutflow;

@@ -4,6 +4,7 @@
 
 import { MOCK_ENGINE_INPUT, EXPECTED } from "../src/shared/mock-data";
 import { runAllScenarios } from "../src/engine/simulate";
+import { applySavingsCheck, calculateWishPlan } from "../src/engine/savings";
 
 let failCount = 0;
 
@@ -93,6 +94,43 @@ console.log("── 데모 비트 2: 선금 500,000원 9/15 입금 가정 ──
   console.log(`   before=${before} after=${after}`);
   check("demoBeat.advancePayment500k.before", before, EXPECTED.demoBeats.advancePayment500k.before);
   check("demoBeat.advancePayment500k.after", after, EXPECTED.demoBeats.advancePayment500k.after);
+}
+
+console.log("── 데모 비트 3: 세금 준비금 288,000원 체크 (이슈 #56) ──");
+{
+  const before = summary.baseline.dDay;
+  const modifiedInput = structuredClone(MOCK_ENGINE_INPUT);
+  const saving = modifiedInput.savings.find((s) => s.id === "saving-001")!;
+  const updated = applySavingsCheck(saving, {
+    id: "check-001",
+    savingId: saving.id,
+    checkedAt: `${modifiedInput.today}T09:00:00+09:00`,
+    amount: 288000,
+    transferConfirmed: true,
+  });
+  modifiedInput.savings = modifiedInput.savings.map((s) => (s.id === saving.id ? updated : s));
+  const after = runAllScenarios(modifiedInput).baseline.dDay;
+  console.log(`   before=${before} after=${after}`);
+  check("demoBeat.taxReserveCheck288k.before", before, EXPECTED.demoBeats.taxReserveCheck288k.before);
+  check("demoBeat.taxReserveCheck288k.after", after, EXPECTED.demoBeats.taxReserveCheck288k.after);
+  check("demoBeat.taxReserveCheck288k.plannedZeroed", updated.plannedAmount, 0);
+  check("demoBeat.taxReserveCheck288k.reservedMoved", updated.reservedAmount, 288000);
+}
+
+console.log("── calculateWishPlan (이슈 #56) ──");
+{
+  const wishSaving = MOCK_ENGINE_INPUT.savings.find((s) => s.id === "saving-002")!;
+  const plan = calculateWishPlan(wishSaving, summary.weekly.weeklyAvailableAmount, MOCK_ENGINE_INPUT.today);
+  // targetAmount=600,000 / weeklyAmount=50,000 -> 정확히 12주.
+  check("wishPlan.weeksRemaining", plan.weeksRemaining, 12);
+  check("wishPlan.targetDate", plan.targetDate, "2026-11-24");
+  // weeklyAmount(50,000) > weeklyAvailableAmount(15,100) x 0.30 -> 경고.
+  check("wishPlan.exceedsWeeklyWarning", plan.exceedsWeeklyWarning, true);
+
+  // kind="tax"는 targetAmount/weeklyAmount가 둘 다 null -> 계산 불가로 null 반환.
+  const taxSaving = MOCK_ENGINE_INPUT.savings.find((s) => s.id === "saving-001")!;
+  const noTargetPlan = calculateWishPlan(taxSaving, summary.weekly.weeklyAvailableAmount, MOCK_ENGINE_INPUT.today);
+  check("wishPlan.noTarget.targetDateNull", noTargetPlan.targetDate, null);
 }
 
 console.log("── 엣지 케이스 ──");
