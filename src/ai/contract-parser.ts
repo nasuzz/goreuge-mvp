@@ -41,7 +41,9 @@ function parseKoreanNumber(value: string): number | null {
   return section + digit;
 }
 
-function findAmounts(text: string): number[] {
+interface AmountMention { index: number; amount: number }
+
+function findAmountMentions(text: string): AmountMention[] {
   const matches: { index: number; amount: number }[] = [];
   const numeric = /(\d[\d,]*(?:\.\d+)?)\s*(만원|원)/g;
   for (const match of text.matchAll(numeric)) {
@@ -53,11 +55,27 @@ function findAmounts(text: string): number[] {
     const value = parseKoreanNumber(match[1]);
     if (value != null) matches.push({ index: match.index ?? 0, amount: value * 10_000 });
   }
-  return matches.sort((a, b) => a.index - b.index).map((item) => item.amount);
+  return matches.sort((a, b) => a.index - b.index);
+}
+
+function isPayerAmountContext(text: string, index: number): boolean {
+  // 지급처 금액 라벨은 보통 숫자 앞에 붙는다. 숫자 뒤의 먼 문맥까지 보면
+  // "총액 980,000원이고 실수령액 ..."에서 총액까지 잘못 제외된다.
+  const context = text.slice(Math.max(0, index - 22), index);
+  return /실\s*수령|수령\s*예정|입금\s*예정\s*금액|지급\s*예정\s*금액|공제액|차감액/.test(context);
+}
+
+function parseAmountToken(raw: string, unit: string): number | null {
+  const value = /^\d/.test(raw) ? Number(raw.replace(/,/g, "")) : parseKoreanNumber(raw);
+  if (value === null || !Number.isFinite(value)) return null;
+  return Math.round(value * (unit === "만원" ? 10_000 : 1));
 }
 
 function extractAmount(text: string, warnings: string[]): { value: number | null; confidence: number } {
-  const amounts = findAmounts(text).filter((amount) => amount >= 10_000);
+  const amounts = findAmountMentions(text)
+    .filter((mention) => !isPayerAmountContext(text, mention.index))
+    .map((mention) => mention.amount)
+    .filter((amount) => amount >= 10_000);
   if (amounts.length === 0) return { value: null, confidence: 0 };
 
   const unique = [...new Set(amounts)];
@@ -83,6 +101,78 @@ function extractAmount(text: string, warnings: string[]): { value: number | null
     warnings.push("분할 지급은 MVP에서 계약을 나눠 등록해야 합니다.");
   }
   return { value, confidence };
+}
+
+interface PayerNetExtraction {
+  value: number | null;
+  confidence: number;
+  needsResolution: boolean;
+}
+
+/**
+ * 지급처가 금액으로 직접 안내한 실수령액만 후보화한다.
+ * 공제율만 있는 문장은 의도적으로 null을 유지하며, 공제액 문구는 gross가 있을 때만 차감한다.
+ */
+function extractPayerStatedNetAmount(
+  text: string,
+  grossAmount: number | null,
+  warnings: string[],
+): PayerNetExtraction {
+  const amount = "([일이삼사오육칠팔구십백천]+|\\d[\\d,]*(?:\\.\\d+)?)\\s*(만원|원)";
+  const directPatterns = [
+    new RegExp(`(?:실\\s*수령(?:액)?|실제\\s*수령\\s*예정\\s*금액|수령\\s*예정\\s*금액|입금\\s*예정\\s*금액|지급\\s*예정\\s*금액)(?:은|는|:)?\\s*${amount}`, "g"),
+    new RegExp(`${amount}\\s*(?:을|를|이|가)?\\s*(?:실\\s*수령(?:액)?|수령\\s*예정\\s*금액)(?:으로)?`, "g"),
+  ];
+  const deductionPatterns = [
+    new RegExp(`(?:공제액|차감액)(?:은|는|:)?\\s*${amount}`, "g"),
+    new RegExp(`${amount}\\s*(?:을|를)?\\s*(?:공제|제외|차감)`, "g"),
+  ];
+
+  const direct = collectPatternAmounts(text, directPatterns);
+  const deductions = collectPatternAmounts(text, deductionPatterns);
+  const uniqueDirect = [...new Set(direct)];
+  const uniqueDeductions = [...new Set(deductions)];
+
+  if (uniqueDirect.length > 1 || uniqueDeductions.length > 1) {
+    warnings.push("지급처 안내 금액이 서로 달라 실수령액 후보를 확정할 수 없습니다.");
+    return { value: null, confidence: 0, needsResolution: true };
+  }
+
+  const directValue = uniqueDirect[0] ?? null;
+  let deductedValue: number | null = null;
+  if (uniqueDeductions.length === 1) {
+    if (grossAmount === null) {
+      warnings.push("공제액은 안내됐지만 계약 총액이 없어 실수령액 후보를 계산할 수 없습니다.");
+      return { value: null, confidence: 0, needsResolution: true };
+    }
+    deductedValue = grossAmount - uniqueDeductions[0];
+  }
+
+  if (directValue !== null && deductedValue !== null && directValue !== deductedValue) {
+    warnings.push("직접 안내된 실수령액과 공제액으로 계산한 금액이 일치하지 않습니다.");
+    return { value: null, confidence: 0, needsResolution: true };
+  }
+
+  const value = directValue ?? deductedValue;
+  if (value === null) return { value: null, confidence: 1, needsResolution: false };
+  if (!Number.isInteger(value) || value < 0 || (grossAmount !== null && value > grossAmount)) {
+    warnings.push("지급처 안내 실수령액이 계약 총액 범위를 벗어나 사용자 확인이 필요합니다.");
+    return { value: null, confidence: 0, needsResolution: true };
+  }
+  return { value, confidence: directValue !== null ? 0.98 : 0.92, needsResolution: false };
+}
+
+function collectPatternAmounts(text: string, patterns: RegExp[]): number[] {
+  const values: number[] = [];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const raw = match[1];
+      const unit = match[2];
+      const value = parseAmountToken(raw, unit);
+      if (value !== null) values.push(value);
+    }
+  }
+  return values;
 }
 
 function pad(value: number): string {
@@ -147,6 +237,7 @@ export function parseContractDeterministically(text: string, options: ParseContr
   const warnings: string[] = [];
   const client = extractClientName(normalized);
   const amount = extractAmount(normalized, warnings);
+  const payerNet = extractPayerStatedNetAmount(normalized, amount.value, warnings);
   const completion = extractCompletionDate(normalized, options.referenceDate);
   const settlement = extractSettlement(normalized);
   const incomeType = extractIncomeType(normalized);
@@ -154,6 +245,7 @@ export function parseContractDeterministically(text: string, options: ParseContr
   const missingFields: string[] = [];
   if (!client.value) missingFields.push("clientName");
   if (amount.value == null) missingFields.push("grossAmount");
+  if (payerNet.needsResolution) missingFields.push("payerStatedNetAmountCandidate");
   if (!completion.value) missingFields.push("completionDate");
   if (settlement.term === "UNKNOWN") missingFields.push("settlementTerm");
   if (incomeType.value === "needs_review") missingFields.push("incomeTypeCandidate");
@@ -161,6 +253,7 @@ export function parseContractDeterministically(text: string, options: ParseContr
   const confidence = {
     clientName: client.confidence,
     grossAmount: amount.confidence,
+    payerStatedNetAmountCandidate: payerNet.confidence,
     completionDate: completion.confidence,
     settlementTerm: settlement.confidence,
     incomeTypeCandidate: incomeType.confidence,
@@ -174,6 +267,7 @@ export function parseContractDeterministically(text: string, options: ParseContr
     candidate: {
       clientName: client.value,
       grossAmount: amount.value,
+      payerStatedNetAmountCandidate: payerNet.value,
       completionDate: completion.value,
       settlementTerm: settlement.term,
       settlementDay: settlement.day,
@@ -187,9 +281,20 @@ export function parseContractDeterministically(text: string, options: ParseContr
 
 export function validateCandidate(candidate: AIContractCandidate): string[] {
   const errors: string[] = [];
+  if (!("payerStatedNetAmountCandidate" in candidate)) {
+    errors.push("payerStatedNetAmountCandidate 필드가 필요합니다(null 허용).");
+  }
+  if (!("payerStatedNetAmountCandidate" in candidate.confidence)) {
+    errors.push("payerStatedNetAmountCandidate confidence가 필요합니다.");
+  }
   const scores = Object.entries(candidate.confidence);
   if (scores.some(([, value]) => !Number.isFinite(value) || value < 0 || value > 1)) errors.push("confidence는 0~1 범위여야 합니다.");
   if (candidate.grossAmount != null && (!Number.isInteger(candidate.grossAmount) || candidate.grossAmount < 0)) errors.push("grossAmount는 0 이상의 원 단위 정수여야 합니다.");
+  if (candidate.payerStatedNetAmountCandidate != null && (
+    !Number.isInteger(candidate.payerStatedNetAmountCandidate) ||
+    candidate.payerStatedNetAmountCandidate < 0 ||
+    (candidate.grossAmount != null && candidate.payerStatedNetAmountCandidate > candidate.grossAmount)
+  )) errors.push("payerStatedNetAmountCandidate는 0 이상이고 grossAmount 이하인 원 단위 정수여야 합니다.");
   if (candidate.completionDate != null && !/^\d{4}-\d{2}-\d{2}$/.test(candidate.completionDate)) errors.push("completionDate는 YYYY-MM-DD 형식이어야 합니다.");
   if (["NEXT_MONTH_DAY", "NET_DAYS"].includes(candidate.settlementTerm ?? "") && candidate.settlementDay == null) errors.push("선택한 정산조건에는 settlementDay가 필요합니다.");
   if (candidate.needsReview !== (candidate.missingFields.length > 0 || scores.some(([, value]) => value < CONFIDENCE_THRESHOLD.normal))) {

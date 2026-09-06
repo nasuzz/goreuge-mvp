@@ -21,7 +21,8 @@
     "paths": {
       "@/*": ["./*"],
       "@/shared/*": ["../src/shared/*"],
-      "@/engine/*": ["../src/engine/*"]
+      "@/engine/*": ["../src/engine/*"],
+      "@/ai/*": ["../src/ai/*"]
     }
   },
   "include": [
@@ -32,7 +33,8 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts",
     "../src/shared/**/*.ts",
-    "../src/engine/**/*.ts"
+    "../src/engine/**/*.ts",
+    "../src/ai/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }
