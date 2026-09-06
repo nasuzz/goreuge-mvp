@@ -81,6 +81,36 @@ API_BASE=https://<배포url> node test/api-smoke.mjs
 API_BASE=https://<배포url> node test/api-smoke.mjs --skip-mutating
 ```
 
+### 2-1-a. 배포본이 정말 main인지 확인
+
+`vercel` CLI는 git이 아니라 **로컬 디렉터리를 그대로 업로드**한다. 그래서 푸시하지 않은
+작업본이 배포될 수 있고, 실제로 두 번 그런 상태에서 검증을 돌린 적이 있다. API 스모크는
+통과하는데(응답 형태가 우연히 같아서) 화면 기능은 다른 코드인 상황이 된다.
+
+AI 후보 라우트의 필드명으로 한 번에 구분된다. 이 필드들은 공용 타입이라 브랜치가 다르면
+거의 항상 어긋난다.
+
+```bash
+echo '{"text":"[D에이전시] 9월 3일 납품, 총 240만원입니다. 익월 말일 정산.","referenceDate":"2026-09-01"}' > req.json
+
+curl -s -X POST https://<배포url>/api/ai/contract-candidate \
+  -H "Content-Type: application/json" --data-binary @req.json > out.json
+
+node -e "console.log(Object.keys(require('./out.json').candidate).join(', '))"
+```
+
+main이면 아래가 나온다. 하나라도 다르면 다른 브랜치가 배포된 것이다.
+
+```
+clientName, grossAmount, payerStatedNetAmountCandidate, completionDate,
+settlementTerm, settlementDay, incomeTypeCandidate, confidence, missingFields, needsReview
+```
+
+실제로 걸렸던 값들: `payerNameCandidate`·`grossAmountCandidate`·`completionDateCandidate`(1차),
+`totalGrossAmount`·`dueDate`(2차). 셋 다 main에는 없는 이름이다.
+
+---
+
 ### 2-2. 재시드
 
 스모크가 데모 데이터를 오염시켰거나 상태가 의심스러우면 Supabase SQL Editor에
@@ -122,7 +152,7 @@ node db/seed-demo.mjs > db/seed-demo.sql
 
 | 시각 | 동작 | 확인할 숫자 |
 |---|---|---|
-| 0:00 | 홈 진입 | 기준 29일 · 낙관 53일 · 비관 13일. 같은 화면 아래에 **협상 카드 3장**(#50)이 상시 노출된다 — 선금 300,000원 +8일 / 카드 결제 21일 연기 +5일 / 월 지출 100,000원 절감 +3일 |
+| 0:00 | 홈 진입 | 기준 29일 · 낙관 53일 · 비관 13일. 스크롤하면 **세 가지 시나리오 바로 아래**에 **협상 카드 3장**(#50)이 상시 노출된다 — 선금 300,000원 +8일 / 카드 결제 21일 연기 +5일 / 월 지출 100,000원 절감 +3일 |
 | 0:20 | 캘린더 | 9월 6일부터 주의, 9월 26일부터 위험 |
 | 0:45 | 카톡 계약문 붙여넣기 | AI 후보 추출 + 확신도 배지 + **근거 구간 하이라이트**(#48) + **계약 위험 신호**(#49) — 같은 화면에 함께 뜬다 |
 | 1:10 | 확인 후 등록 | 예정입금일·D-day 갱신 |
@@ -248,7 +278,7 @@ docs/release.md:<위 블록의 git grep 줄>     <- 유일하게 허용되는 �
 | 기능 | 상태 | 이유 |
 |---|---|---|
 | 세금 준비금 체크의 D-day 효과 | 화면까지 구현 | 화면은 2:45에 보여주지만 **체크해서 D-day가 09-30 → 09-23으로 7일 앞당겨지는 것**까지는 시간이 없다. 15초를 더 쓸 수 있으면 여기에 쓴다 — 세금 낼 돈을 떼면 쓸 돈이 준다는 걸 그대로 보여줘서 메시지가 정직하다 |
-| 협상 카드 ([#50](https://github.com/hsoo23/goreuge-mvp/issues/50)) | **구현 완료** — 엔진 `findRecovery`(#58) + 홈 `RecoveryCards`·`GET /api/recovery`(#81) | 시연 가능하다. 홈의 `위험 원인` 바로 아래, 기존 `대응안 비교` 위에 카드 3장으로 뜬다. 대본에 넣을지는 아래 "대본에 넣을지 남은 결정" 참고 |
+| 협상 카드 ([#50](https://github.com/hsoo23/goreuge-mvp/issues/50)) | **구현 완료** — 엔진 `findRecovery`(#58) + 홈 `RecoveryCards`·`GET /api/recovery`(#81) | 시연 가능하다. 홈 화면에서 `세 가지 시나리오` 바로 아래에 카드 3장으로 뜬다(#83 리디자인 이후 위치). 0:00 홈 진입 비트에서 함께 보이므로 별도 시각을 쓰지 않는다 |
 | 공휴일 보정 (#57) | 엔진 구현, 기본 OFF | 켜면 데모 숫자가 바뀐다(익월 말일 10-31 → 11-02). 끈 채로 간다 |
 
 ### 4-3. 기능명세와 구현 일치
