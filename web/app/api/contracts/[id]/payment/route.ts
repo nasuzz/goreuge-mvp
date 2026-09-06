@@ -81,8 +81,8 @@ export async function PATCH(request: NextRequest, ctx: { params: Promise<{ id: s
     const client = snapshot.clients.find((c) => c.id === updated.clientId);
     let updatedClient = client ?? null;
     if (client) {
-      // recalculateClientStats는 넘긴 배열을 "이 거래처의 완료 계약"으로 그대로 센다
-      // (clientId를 스스로 거르지 않는다). 전체 계약을 넘기면 completedCount가
+      // recalculateClientStats는 넘긴 배열을 이 거래처의 완료 계약 표본으로 본다
+      // (clientId를 스스로 거르지 않는다). 전체 계약을 넘기면 지연 통계 표본이
       // 다른 거래처 건까지 포함해 부풀고, 그 값이 cold start 판정(3건)을 흔든다.
       const completed = snapshot.contracts.filter(
         (c) => c.clientId === client.id && c.actualDate !== null,

@@ -72,7 +72,7 @@ export type OutflowRecurrence = "monthly" | "once";
 
 /** 지연 시나리오 산출 근거. 화면에 "데이터 근거" 문구로 표시(기획서 4-4) */
 export type DelayBasis =
-  | "client_history" // 완료 이력 3건 이상 -> 중앙값/p90
+  | "client_history" // 지연일 계산 가능 완료 건 3건 이상 -> 중앙값/p90
   | "cold_start";    // 이력 부족 -> 신규 거래처 정책값
 
 /** 실수령액 산출 가능 여부 */

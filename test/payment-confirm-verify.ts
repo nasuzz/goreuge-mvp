@@ -96,7 +96,7 @@ console.log("\n── recalculateClientStats: 3건 이상이면 중앙값·p90 �
     { expectedDate: "2026-06-01", actualDate: "2026-06-20" }, // 19일 지연
   ] as Contract[];
   const result = recalculateClientStats(client, completed);
-  check("completedCount는 넘어온 배열 길이", result.completedCount, 3);
+  check("completedCount는 지연일 계산 가능 건수", result.completedCount, 3);
   check("medianDelayDays (정렬: 5,5,19 -> 중앙값 5)", result.medianDelayDays, 5);
   check("p90DelayDays (최근접 순위: ceil(3*0.9)=3번째 -> 19)", result.p90DelayDays, 19);
 }
@@ -109,7 +109,7 @@ console.log("── recalculateClientStats: 3건 미만이면 null (clientHistor
     { expectedDate: "2026-07-10", actualDate: "2026-07-15" },
   ] as Contract[];
   const result = recalculateClientStats(client, completed);
-  check("completedCount는 2건 그대로 기록됨(3건 미만이어도)", result.completedCount, 2);
+  check("completedCount는 지연일 계산 가능 2건", result.completedCount, 2);
   check("medianDelayDays는 null (3건 미만)", result.medianDelayDays, null);
   check("p90DelayDays는 null (3건 미만)", result.p90DelayDays, null);
 }
@@ -124,12 +124,12 @@ console.log("── recalculateClientStats: 예정보다 일찍 들어온 건은
     { expectedDate: "2026-09-01", actualDate: "2026-08-25" }, // 7일 조기 -> 0으로 clamp
   ] as Contract[];
   const result = recalculateClientStats(client, completed);
-  check("4건 전부 completedCount에 반영", result.completedCount, 4);
+  check("completedCount는 지연일 계산 가능 4건", result.completedCount, 4);
   check("조기입금이 섞여도 음수 없이 계산됨 (정렬: 0,5,5,19 -> 중앙값 5)", result.medianDelayDays, 5);
   check("p90도 정상 (ceil(4*0.9)=4번째 -> 19)", result.p90DelayDays, 19);
 }
 
-console.log("── recalculateClientStats: expectedDate 없는 완료 계약은 completedCount엔 들어가되 지연일 계산에서는 제외 ──");
+console.log("── recalculateClientStats: expectedDate 없는 완료 계약은 completedCount와 지연일 계산에서 제외 ──");
 {
   const client: Client = { id: "client-004", name: "신규 거래처", completedCount: 0, medianDelayDays: null, p90DelayDays: null };
   const completed = [
@@ -139,8 +139,22 @@ console.log("── recalculateClientStats: expectedDate 없는 완료 계약은
     { expectedDate: null, actualDate: "2026-08-25" }, // 정산조건 UNKNOWN 등으로 expectedDate가 끝내 없었던 케이스
   ] as Contract[];
   const result = recalculateClientStats(client, completed);
-  check("completedCount는 4건 그대로", result.completedCount, 4);
+  check("completedCount는 지연일 계산 가능 3건", result.completedCount, 3);
   check("지연일 계산은 유효한 3건만으로 이뤄짐 (median 5)", result.medianDelayDays, 5);
+}
+
+console.log("── recalculateClientStats: 지연일 계산 가능 건이 없으면 completedCount도 0 ──");
+{
+  const client: Client = { id: "client-004b", name: "신규 거래처", completedCount: 3, medianDelayDays: 10, p90DelayDays: 20 };
+  const completed = [
+    { expectedDate: null, actualDate: "2026-09-01" },
+    { expectedDate: null, actualDate: "2026-09-02" },
+    { expectedDate: null, actualDate: "2026-09-03" },
+  ] as Contract[];
+  const result = recalculateClientStats(client, completed);
+  check("completedCount는 지연일 계산 가능 0건", result.completedCount, 0);
+  check("medianDelayDays는 null", result.medianDelayDays, null);
+  check("p90DelayDays는 null", result.p90DelayDays, null);
 }
 
 console.log("── recalculateClientStats: 완료 계약이 아예 없으면 전부 null ──");
