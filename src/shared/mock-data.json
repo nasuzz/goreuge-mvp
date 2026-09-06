@@ -36,9 +36,22 @@
         "daysEarlier": 16
       },
       "advancePayment500k": {
+        "_note": "격리 시나리오(위험 전환 없이 baseline=09-30에서 바로 적용)일 때만 유효. #8: 위험 전환(1:35) 이후 이어서 적용하면 09-15 입금은 D-day(09-14)보다 하루 늦어 delta=0이 된다. 실제 2:00 데모 값은 advancePayment1M을 쓴다.",
         "before": "2026-09-30",
         "after": "2026-10-13",
         "daysRecovered": 13
+      },
+      "advancePayment1M": {
+        "_note": "#8 결정. 1:35(contract-002 위험 전환)로 D-day가 09-14로 당겨진 '이후' 상태에 이어서 적용한 실측값. whatIfExamples[0]과 일치해야 한다.",
+        "before": "2026-09-14",
+        "after": "2026-09-26",
+        "daysRecovered": 12
+      },
+      "delayCardPayment2Weeks": {
+        "_note": "#8 A+B 병기안의 B. 1:35 이후 이어서 적용한 실측값. whatIfExamples[1]과 일치해야 한다.",
+        "before": "2026-09-14",
+        "after": "2026-09-20",
+        "daysRecovered": 6
       },
       "taxReserveCheck288k": {
         "before": "2026-09-30",
@@ -456,13 +469,14 @@
   ],
   "whatIfExamples": [
     {
-      "_case": "기획서 6-1 원문 예시. 데모 2:00 구간. 실측 결과 13일 회복",
+      "_case": "#8 결정. 기획서 6-1 원문 예시(선금 500,000원 9/15)는 데모 순서대로(1:35 위험 전환 → 2:00 대응안) 이어서 적용하면 delta=0이 되어(입금일이 위험 전환 후 D-day인 09-14보다 하루 늦음) 100만원/9-14로 교체함. A+B 병기안의 A. 실측 근거는 test/whatif-verify.ts.",
       "type": "advance_payment",
-      "label": "선금 500,000원 9월 15일 입금 가정",
-      "amount": 500000,
-      "date": "2026-09-15"
+      "label": "선금 100만원 9월 14일 입금 가정",
+      "amount": 1000000,
+      "date": "2026-09-14"
     },
     {
+      "_case": "#8 A+B 병기안의 B. 위험 전환 이후 이어서 적용해도 정상 동작(+6일).",
       "type": "delay_outflow",
       "label": "카드 결제일 2주 연기",
       "outflowId": "outflow-002",

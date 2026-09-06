@@ -183,34 +183,6 @@ async function main() {
   check("이번 주 가용금액", dash.body?.weekly?.weeklyAvailableAmount, EXPECTED.weekly.weeklyAvailableAmount);
   note("지연 계약 수", dash.body?.riskCause?.delayedContracts?.length);
 
-  // ── 5. POST /api/whatif ──────────────────────────────────
-  // #23의 번호는 5번이지만 4번(위험 지정)보다 먼저 돌린다. 4번이 계약을 risk로
-  // 바꾸면 기준 D-day가 09-30에서 09-14로 당겨져, what-if 기준선이 데모 비트
-  // 숫자(09-30 -> 10-13)와 달라진다. 실제로 4번을 먼저 돌렸더니 선금 가정이
-  // +0일로 나왔다 — 선금 입금일(09-15)이 당겨진 D-day 뒤라서다. 버그가 아니라
-  // 순서 문제이므로, 한 번 실행으로 둘 다 검증되도록 순서를 바꿨다.
-  section(5, "POST /api/whatif — 대응안 3개 비교");
-  const advance = EXPECTED.demoBeats.advancePayment500k;
-  const whatif = await call("POST", "/api/whatif", {
-    userId: DEMO_USER_ID,
-    assumptions: [
-      { type: "advance_payment", label: "선금 500,000원", amount: 500000, date: "2026-09-15" },
-      { type: "delay_outflow", label: "카드 결제 연기", outflowId: OUTFLOW_002, newDate: "2026-09-28" },
-      { type: "reduce_spending", label: "월 지출 200,000원 절감", monthlyReduction: 200000 },
-    ],
-  });
-  check("비교 200", whatif.status, 200);
-  check("결과 3건", whatif.body?.results?.length, 3);
-  for (const r of whatif.body?.results ?? []) {
-    note(r.assumption?.label, `${r.dDayBefore} -> ${r.dDayAfter} (${r.dayDelta >= 0 ? "+" : ""}${r.dayDelta}일)`);
-  }
-  const firstResult = whatif.body?.results?.[0];
-  check(
-    `선금 500,000원 가정: ${advance.before} -> ${advance.after}`,
-    { before: firstResult?.dDayBefore, after: firstResult?.dDayAfter },
-    { before: advance.before, after: advance.after },
-  );
-
   // ── 4. PATCH /api/contracts/:id/status ───────────────────
   section(4, "PATCH /api/contracts/:id/status — 위험 지정 후 D-day 변동");
   if (SKIP_MUTATING) {
@@ -234,6 +206,43 @@ async function main() {
 
     const after = await call("GET", `/api/dashboard?userId=${DEMO_USER_ID}`);
     check(`기준 D-day ${beat.before} -> ${beat.after}`, after.body?.baseline?.dDay, beat.after);
+  }
+
+  // ── 5. POST /api/whatif ──────────────────────────────────
+  // #8 결정: 대응안은 4단계(위험 지정)가 이미 반영된 상태에 "이어서" 확인한다.
+  // 사람이 화면을 보며 진행하는 실제 라이브 리허설은 1:35(위험 전환)를 먼저 보여준
+  // 뒤에야 2:00(대응안)으로 넘어갈 수 있어서, API 호출 순서를 바꿔 우회하는 이전
+  // 방식(#23 코멘트 참고)은 라이브 리허설에 그대로 못 쓴다. 그래서 순서를 원래대로
+  // (4 → 5) 되돌리고, 대신 mock-data.json의 whatIfExamples를 "위험 전환 이후에도
+  // 정상 동작하는" 값(선금 100만원/9-14, 카드 결제 2주 연기)으로 교체했다.
+  section(5, "POST /api/whatif — 대응안(A+B) 비교");
+  const whatif = await call("POST", "/api/whatif", {
+    userId: DEMO_USER_ID,
+    assumptions: [
+      { type: "advance_payment", label: "선금 100만원", amount: 1000000, date: "2026-09-14" },
+      { type: "delay_outflow", label: "카드 결제 연기", outflowId: OUTFLOW_002, newDate: "2026-09-28" },
+    ],
+  });
+  check("비교 200", whatif.status, 200);
+  check("결과 2건", whatif.body?.results?.length, 2);
+  for (const r of whatif.body?.results ?? []) {
+    note(r.assumption?.label, `${r.dDayBefore} -> ${r.dDayAfter} (${r.dayDelta >= 0 ? "+" : ""}${r.dayDelta}일)`);
+  }
+  if (!SKIP_MUTATING) {
+    const advance = EXPECTED.demoBeats.advancePayment1M;
+    const delay = EXPECTED.demoBeats.delayCardPayment2Weeks;
+    const advanceResult = whatif.body?.results?.find((r) => r.assumption?.type === "advance_payment");
+    const delayResult = whatif.body?.results?.find((r) => r.assumption?.type === "delay_outflow");
+    check(
+      `선금 100만원 가정 (4단계 위험 지정 이후): ${advance.before} -> ${advance.after}`,
+      { before: advanceResult?.dDayBefore, after: advanceResult?.dDayAfter },
+      { before: advance.before, after: advance.after },
+    );
+    check(
+      `카드 결제 2주 연기 (4단계 위험 지정 이후): ${delay.before} -> ${delay.after}`,
+      { before: delayResult?.dDayBefore, after: delayResult?.dDayAfter },
+      { before: delay.before, after: delay.after },
+    );
   }
 
   // ── 결과 ─────────────────────────────────────────────────
