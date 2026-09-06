@@ -12,7 +12,7 @@
     "issue16-verify": "npm run build && node dist/test/issue16-verify.js",
     "test:ai": "npm run build && node dist/test/ai-evaluation.js",
     "test:ai-confirmation": "npm run build && node dist/test/ai-confirmation-flow.js",
-    "verify": "npm run typecheck && npm run build && node dist/test/smoke.js && node dist/test/engine-verify.js && node dist/test/whatif-verify.js && node dist/test/expected-verify.js && node dist/test/issue16-verify.js && node dist/test/ai-evaluation.js && node dist/test/payment-verify.js && node dist/test/ai-confirmation-flow.js",
+    "verify": "npm run typecheck && npm run build && node test/run-verify.mjs",
     "payment-verify": "npm run build && node dist/test/payment-verify.js"
   },
   "devDependencies": {

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { AIContractCandidate } from "../src/shared/types";
 import { parseContractDeterministically, validateCandidate } from "../src/ai/contract-parser";
+import { GeminiContractProvider } from "../src/ai/gemini-provider";
 import { parseContractWithFallback } from "../src/ai/parser-service";
 import { OpenAIContractProvider } from "../src/ai/openai-provider";
 import { maskContractText } from "../src/ai/privacy-mask";
@@ -142,6 +143,35 @@ async function main() {
     failures.push("OpenAI Structured Outputs 스키마에 지급처 안내 실수령액 후보가 없습니다.");
   }
 
+  let geminiRequestBody = "";
+  let geminiRequestUrl = "";
+  const geminiProvider = new GeminiContractProvider({
+    apiKey: "test-gemini-key",
+    fetchImpl: async (url, init) => {
+      geminiRequestUrl = String(url);
+      geminiRequestBody = String(init?.body ?? "");
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(maskedAIOutput) }] } }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    },
+  });
+  const geminiResult = await parseContractWithFallback(sensitiveText, dataset.referenceDate, geminiProvider);
+  if (geminiResult.source !== "ai" || geminiResult.candidate.clientName !== "D에이전시") {
+    failures.push("Gemini provider의 JSON 출력 연결 또는 로컬 거래처명 복원이 동작하지 않았습니다.");
+  }
+  if (!geminiRequestUrl.includes("generativelanguage.googleapis.com") || !geminiRequestUrl.includes("test-gemini-key")) {
+    failures.push("Gemini API 요청 URL이 올바르지 않습니다.");
+  }
+  if (geminiRequestBody.includes("D에이전시") || geminiRequestBody.includes("1002-123-456789")) {
+    failures.push("Gemini API 요청 본문에 마스킹 전 개인정보가 포함됐습니다.");
+  }
+  if (!geminiRequestBody.includes("[거래처]") || !geminiRequestBody.includes("[계좌번호]")) {
+    failures.push("Gemini API 요청 본문에 마스킹 placeholder가 없습니다.");
+  }
+  if (!geminiRequestBody.includes("responseMimeType")) {
+    failures.push("Gemini API 요청에 JSON 응답 설정이 없습니다.");
+  }
+
   const legacyCandidate = { ...mockAIOutput } as Partial<AIContractCandidate> & Record<string, unknown>;
   delete legacyCandidate.payerStatedNetAmountCandidate;
   const legacyConfidence = { ...mockAIOutput.confidence } as Partial<AIContractCandidate["confidence"]>;
@@ -207,6 +237,7 @@ async function main() {
   console.log(`- 스키마 오류: ${invalidOutputs}건`);
   console.log(`- fallback: ${fallbackResult.source}`);
   console.log(`- OpenAI provider mock: ${aiResult.source}`);
+  console.log(`- Gemini provider mock: ${geminiResult.source}`);
   console.log("- 확인 모달 규칙: confidence 경계·사용자 확인·필수값 차단 통과");
 
   if (failures.length > 0) {
