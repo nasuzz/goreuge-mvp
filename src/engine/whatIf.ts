@@ -64,6 +64,63 @@ export function compareWhatIf(
   });
 }
 
+/**
+ * 여러 가정을 **같은 복사본에 순차 적용**한 뒤 한 번만 재시뮬레이션한다.
+ *
+ * compareWhatIf는 가정마다 원본의 깨끗한 복사본에서 시작하므로 "둘 다 적용하면
+ * 어떻게 되는가"를 낼 수 없다. 그런데 D-day는 "잔액이 최초로 0 이하가 되는 날"이라
+ * 두 조치의 dayDelta를 더할 수 없다 — 이슈 #50 실측:
+ *
+ *   선금 1,500,000원 단독 : 09-14 -> 10-08  (+24일)
+ *   카드 결제 연기 단독    : 09-14 -> 09-20  (+6일)
+ *   둘 다 적용            : 09-14 -> 10-08  (+24일, 30일이 아니다)
+ *
+ * 선금만으로 D-day가 10/8까지 밀리면 9/14의 카드 청구는 더 이상 병목이 아니기
+ * 때문이다. 그래서 조합은 반드시 이 함수로 평가해야 한다.
+ *
+ * 반환 타입이 WhatIfResult가 아닌 이유: WhatIfResult.assumption은 단수라
+ * 조합을 표현하면 "N개 중 하나"만 담겨 사실과 달라진다. 가정 목록을 그대로
+ * 싣는 별도 타입을 둔다.
+ */
+export interface CombinedWhatIfResult {
+  assumptions: WhatIfAssumption[];
+  dDayBefore: DateString | null;
+  dDayAfter: DateString | null;
+  /** 양수면 D-day가 늦춰짐(좋아짐) */
+  dayDelta: number;
+}
+
+export function compareWhatIfCombined(
+  input: EngineInput,
+  assumptions: WhatIfAssumption[],
+  now: DateTimeString,
+): CombinedWhatIfResult {
+  if (assumptions.length > MVP_POLICY.maxWhatIfAssumptions) {
+    throw new Error(
+      `[engine] compareWhatIfCombined: 대응안은 최대 ${MVP_POLICY.maxWhatIfAssumptions}개까지입니다 (기획서 6-1, 실제 ${assumptions.length}개 전달됨)`,
+    );
+  }
+
+  const before = runScenario(input, "baseline");
+  if (assumptions.length === 0) {
+    return { assumptions, dDayBefore: before.dDay, dDayAfter: before.dDay, dayDelta: 0 };
+  }
+
+  // 복사본 하나에 전부 순차 적용한 뒤 한 번만 돌린다.
+  const modifiedInput = structuredClone(input);
+  for (const assumption of assumptions) {
+    applyAssumption(modifiedInput, assumption, input.today, now);
+  }
+  const after = runScenario(modifiedInput, "baseline");
+
+  return {
+    assumptions,
+    dDayBefore: before.dDay,
+    dDayAfter: after.dDay,
+    dayDelta: computeDayDelta(before, after),
+  };
+}
+
 // ── 가정 반영 ──────────────────────────────────────────────
 
 function applyAssumption(

@@ -6,6 +6,23 @@ DRI: C. 검수: A·B.
 근거 명령을 함께 적었다. 숫자가 안 맞으면 이 문서가 아니라 실측을 믿고, 실측이 바뀌었으면
 이 문서를 고친다.
 
+## 먼저 — 대부분은 스크립트가 대신한다
+
+`scripts/deploy.sh`(이슈 #43)가 아래 2장과 4-1장을 그대로 실행한다. 손으로 밟을 이유가
+없으면 이쪽을 쓴다.
+
+```bash
+scripts/deploy.sh --check                              # 로컬 검증 + 비밀값 스캔
+scripts/deploy.sh --prod --smoke                       # 배포 후 배포 URL에 스모크
+scripts/deploy.sh --api-base https://<배포url> --smoke  # 이미 배포된 URL만 검증
+```
+
+`--smoke`는 기본이 `--skip-mutating`이라 데모 데이터를 건드리지 않는다. 전체 스모크가
+필요하면 `--mutating-smoke`를 함께 준다.
+
+**스크립트가 대신하지 못하는 것은 1장(Vercel 프로젝트 설정과 환경변수)과 3장(리허설),
+4-2~4-4장이다.** 1장은 대시보드 작업이고 나머지는 사람이 눈으로 확인해야 한다.
+
 ---
 
 ## 1. Vercel 배포
@@ -31,8 +48,11 @@ DRI: C. 검수: A·B.
 | `SUPABASE_SECRET_KEY` | A가 공유한 값 | `NEXT_PUBLIC_` 접두사 금지 (D5-a) |
 | `DEMO_USER_ID` | `a0000000-0000-4000-8000-000000000001` | **아래 경고 참고** |
 | `DEMO_TODAY` | `2026-09-01` | 비우면 실제 KST 날짜를 쓴다 |
-| `OPENAI_API_KEY` | B가 공유한 값 | #27·#29 머지 후 |
-| `OPENAI_MODEL` | `gpt-5.4-mini` | #27·#29 머지 후 |
+| `GEMINI_API_KEY` | B가 Google AI Studio에서 만든 값 | 서버 전용, `NEXT_PUBLIC_` 접두사 금지 |
+| `GEMINI_MODEL` | `gemini-3-flash-preview` | Gemini 무료 tier 대상 모델. 필요 시 교체 |
+
+PR Preview URL 대상으로 `test/api-smoke.mjs`를 돌릴 때는 같은 값을 Preview 환경에도 넣는다.
+Production에만 넣으면 Preview 배포 자체는 성공해도 API route가 500을 반환한다.
 
 > **`DEMO_USER_ID`를 반드시 넣을 것.** 미설정 시 API 라우트가 "가장 먼저 온보딩한
 > 사용자"를 고르는데, 현재 DB에는 데모 계정 외에 2026-09-03에 생성된 계정이 하나 더
@@ -44,6 +64,9 @@ DRI: C. 검수: A·B.
 
 ### 2-1. API 스모크
 
+`scripts/deploy.sh --api-base https://<배포url> --smoke`는 아래 두 번째 `--skip-mutating`
+명령과 같은 안전 모드로 실행한다. 옵션 없이 직접 돌리는 첫 번째 명령은 전체 스모크다.
+
 ```bash
 API_BASE=https://<배포url> node test/api-smoke.mjs
 ```
@@ -51,8 +74,8 @@ API_BASE=https://<배포url> node test/api-smoke.mjs
 0~5단계를 자동 검증한다. 실패 0건이어야 한다. 종료 코드로 성공을 판정할 수 있다
 (성공 0 / 실패·중단 1).
 
-**4단계가 데모 계약을 실제로 `risk`로 바꾸고 임시 유저를 남긴다.** 데모 직전이라면
-`--skip-mutating`으로 돌리고, 이미 돌렸다면 재시드한다.
+위 명령처럼 옵션 없이 직접 돌리면 4단계가 데모 계약을 실제로 `risk`로 바꾸고 임시 유저를
+남긴다. 데모 직전이라면 `--skip-mutating`으로 돌리고, 이미 돌렸다면 재시드한다.
 
 ```bash
 API_BASE=https://<배포url> node test/api-smoke.mjs --skip-mutating
@@ -136,19 +159,39 @@ node db/seed-demo.mjs > db/seed-demo.sql
 
 ### 4-1. 키·개인정보 미포함
 
-**반드시 `origin/main`을 기준으로 돌린다.** 로컬 `main`은 다른 워크트리에 체크아웃돼
-있으면 뒤처져 있을 수 있고, 그러면 최신 커밋에 들어온 키를 놓친다.
+`scripts/deploy.sh --check`가 아래를 그대로 실행한다. 손으로 돌릴 이유가 없으면 그쪽을
+쓴다. 여기 남겨두는 것은 스크립트가 무엇을 보는지 알기 위해서다.
+
+**스캔 대상은 `origin/main`이 아니라 현재 작업트리다.** `vercel --prod`는 git이 아니라
+로컬 디렉터리를 그대로 업로드하기 때문이다. `origin/main`만 보면 아직 커밋하지 않은
+변경이나 로컬 전용 브랜치에 들어 있는 키를 "깨끗하다"고 통과시키고, 그 코드가 그대로
+배포된다. (이 문서의 이전 판이 `origin/main` 기준으로 적혀 있었다. 이슈 #43·PR #44에서
+스크립트를 만들며 드러난 구멍이다.)
 
 ```bash
-git fetch origin
-git grep -nIE "(eyJ[A-Za-z0-9_-]{30,})|(sk-[A-Za-z0-9]{20,})|(sb_secret_[A-Za-z0-9_-]{10,})|(service_role)|(-----BEGIN [A-Z ]*PRIVATE KEY)" origin/main -- . ':!*.lock' ':!package-lock.json'
-git ls-tree -r --name-only origin/main | grep -E "\.env"
+git grep -nIE "(eyJ[A-Za-z0-9_-]{30,})|(sk-[A-Za-z0-9]{20,})|(AIza[A-Za-z0-9_-]{20,})|(sb_secret_[A-Za-z0-9_-]{10,})|(service_role)|(-----BEGIN [A-Z ]*PRIVATE KEY)" -- . ':!*.lock' ':!package-lock.json' ':!scripts/deploy.sh'
+git ls-files | grep -E "\.env" | grep -v "\.env\.example$"
 git log --all --diff-filter=A --name-only --format="" | sort -u | grep -E "\.env($|\.local|\.production)"
-git grep -nIE "01[0-9]-[0-9]{3,4}-[0-9]{4}|[A-Za-z0-9._%+-]+@(gmail|naver|daum|kakao|hanmail)\.[a-z]{2,3}" origin/main -- . ':!*.lock' ':!package-lock.json'
+git grep -nIE "01[0-9]-[0-9]{3,4}-[0-9]{4}|[A-Za-z0-9._%+-]+@(gmail|naver|daum|kakao|hanmail)\.[a-z]{2,3}" -- . ':!*.lock' ':!package-lock.json'
 ```
 
-1·3·4번은 결과가 없어야 한다. 2번은 `.env.example`과 `web/.env.example` 둘만 나와야 하고,
-두 파일 모두 값이 비어 있어야 한다.
+2·3·4번은 결과가 없어야 한다. 2번은 `.env.example` 계열을 빼고 세므로, 값이 든 `.env`
+파일이 트리에 들어왔을 때만 걸린다.
+
+**1번은 손으로 돌리면 이 문서 자신의 위 블록 한 줄에 걸린다.** 정규식을 예시로 적어둔
+줄이라서다. 그 한 줄 외에 다른 결과가 없으면 통과다.
+
+```
+docs/release.md:<위 블록의 git grep 줄>     <- 유일하게 허용되는 결과
+```
+
+`scripts/deploy.sh --check`는 이 한 줄만 결과에서 걸러내므로 사람이 판단할 필요가 없다.
+같은 파일 전체를 빼지 않는 것은, 그러면 이 문서에 진짜 키가 들어와도 못 잡는 사각지대가
+생기기 때문이다. 반면 `scripts/deploy.sh`는 정규식 자체를 코드로 담고 있어 줄 단위로
+거르기 어려워 파일 전체를 뺀다 — 탐지 로직을 담은 파일이라 비밀값이 섞일 자리가 아니다.
+
+`origin/main`을 따로 확인하고 싶으면 위 명령에 `origin/main`을 붙여 한 번 더 돌린다.
+배포 안전성의 기준은 작업트리이고, 저장소 이력 점검은 그와 별개다.
 
 휴대폰·이메일 패턴에서 UUID가 오탐으로 걸리지 않게 앞자리를 `01`로 고정했다. 범용
 `[0-9]{3}-[0-9]{3,4}-[0-9]{4}`를 쓰면 `d0000000-0000-4000-8000-…` 같은 시드 UUID가
