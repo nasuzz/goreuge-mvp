@@ -156,7 +156,7 @@ export default function OnboardingPage() {
         데모 기본값으로 되돌리기
       </button>
 
-      <p className="px-1 text-xs text-muted">{FIXED_COPY.serviceDisclaimer}</p>
+      {/* 서비스 고지는 layout.tsx의 전역 푸터로 옮겼다. 여기 두면 두 번 나온다. */}
     </main>
   );
 }

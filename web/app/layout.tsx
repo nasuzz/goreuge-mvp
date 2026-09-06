@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
+import { FIXED_COPY } from "@/shared/policy";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +29,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pb-28 pt-6 sm:px-6">
           {children}
+          {/* 기획서 13장 고정 문구. 온보딩은 1회성 화면이라 거기에만 두면 데모 경로
+              (홈 진입으로 시작)에서 한 번도 노출되지 않는다. 전역으로 올린다. */}
+          <footer className="mt-10 border-t border-line pt-4 text-xs leading-relaxed text-muted">
+            {FIXED_COPY.serviceDisclaimer}
+          </footer>
         </div>
         <NavBar />
       </body>
