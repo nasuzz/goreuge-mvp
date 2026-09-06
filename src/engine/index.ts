@@ -23,4 +23,4 @@ export { calculateExpectedNetAmount } from "./expectedNetAmount";
 export type { ExpectedNetAmountResult } from "./expectedNetAmount";
 
 // [이슈 #57 추가] 주말·공휴일 보정 (기본 OFF, adjustWeekendHoliday 옵션으로 켠다)
-export { isHoliday, KR_HOLIDAYS_CACHE } from "../shared/holidays";
+export { isHoliday, KR_HOLIDAYS_CACHE, KR_HOLIDAYS_COVERED_YEARS } from "../shared/holidays";

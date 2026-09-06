@@ -68,5 +68,44 @@ check(
   null,
 );
 
+console.log("── 캐시에 없는 연도(2027)는 보정하지 않음 (PR #63 리뷰: lyoonji) ──");
+check(
+  // 완료 2027-01-15 + 익월 말일 = 2027-02-28(일). 커버 밖 연도라 주말이어도 그대로 반환.
+  // (보정했다면 2027-03-01(월)이 되는데, 그날은 삼일절이라 실제로는 영업일이 아니다 —
+  //  캐시가 2027을 모르므로 "틀리게 보정"하는 대신 아예 손대지 않는다.)
+  "2027-02-28(일)도 커버 밖이라 보정 없이 그대로",
+  calculateExpectedDate(
+    { settlementTerm: "NEXT_MONTH_END", settlementDay: null, completionDate: "2027-01-15", invoiceDate: null },
+    { adjustWeekendHoliday: true },
+  ),
+  "2027-02-28",
+);
+check(
+  // 완료 2026-12-20 + NET_DAYS 60일 = 2027-02-18(목, 평일). 연도가 커버 밖이라
+  // 애초에 보정 대상 여부도 판단하지 않고 그대로 반환(우연히 평일이라 결과는 같지만
+  // 판단 로직 자체가 스킵되는 걸 확인하는 회귀 케이스).
+  "연말 계약이 다음 해로 넘어가는 예정일도 커버 밖이면 그대로",
+  calculateExpectedDate(
+    { settlementTerm: "NET_DAYS", settlementDay: 60, completionDate: "2026-12-20", invoiceDate: null },
+    { adjustWeekendHoliday: true },
+  ),
+  "2027-02-18",
+);
+check(
+  // 연휴가 연말에 이틀 연속(12/30, 12/31)이라고 가정하고 하루씩 밀다 보면 2027-01-01로
+  // 넘어간다 — 그 순간 연도가 coveredYears(2026) 밖이 되므로, 1/1 자체가 공휴일인지는
+  // 더 확인하지 않고 거기서 멈춘다(실제 신정 여부와 무관하게 "더는 모른다"가 정답).
+  "연휴 보정 도중 커버 밖 연도로 넘어가면 그 지점에서 멈춘다",
+  calculateExpectedDate(
+    { settlementTerm: "ON_COMPLETION", settlementDay: null, completionDate: "2026-12-30", invoiceDate: null },
+    {
+      adjustWeekendHoliday: true,
+      holidays: new Set(["2026-12-30", "2026-12-31"]),
+      coveredYears: new Set([2026]),
+    },
+  ),
+  "2027-01-01",
+);
+
 console.log("\n" + (failCount === 0 ? `✅ 전부 통과 (${failCount}건 실패)` : `❌ ${failCount}건 실패`));
 process.exit(failCount === 0 ? 0 : 1);
