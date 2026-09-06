@@ -6,6 +6,7 @@ import { parseContractWithFallback } from "../src/ai/parser-service";
 import { OpenAIContractProvider } from "../src/ai/openai-provider";
 import { maskContractText } from "../src/ai/privacy-mask";
 import { getCandidateFieldReviews, getConfidenceTone, getConfirmationGate } from "../src/ai/review-rules";
+import { MOCK } from "../src/shared/mock-data";
 
 type Expected = Pick<
   AIContractCandidate,
@@ -48,6 +49,17 @@ const labeledCases = dataset.cases.filter((testCase) =>
   testCase.tags.includes("labeled_client_colon"),
 );
 if (labeledCases.length < 3) failures.push(`라벨형 거래처 평가 문장은 최소 3건이어야 합니다. 현재 ${labeledCases.length}건`);
+
+// mock-data.json의 AI 후보 픽스처도 스키마를 지켜야 한다. 지금까지는 파서가 만든
+// 후보와 합성 케이스에만 validateCandidate를 돌려서, 픽스처에 필드가 빠져도
+// verify가 통과했다. 실제로 payerStatedNetAmountCandidate가 후보가 아닌 계약
+// 객체에 들어가 후보 0이 undefined인 채로 머지된 적이 있다.
+for (const [index, candidate] of MOCK.aiCandidates.entries()) {
+  const errors = validateCandidate(candidate);
+  if (errors.length > 0) {
+    failures.push(`mock-data aiCandidateExamples[${index}] 스키마 오류: ${errors.join(" ")}`);
+  }
+}
 
 for (const testCase of dataset.cases) {
   const { candidate } = parseContractDeterministically(testCase.text, { referenceDate: dataset.referenceDate });
