@@ -39,7 +39,7 @@ export interface User {
 export interface Client {
   id: string;
   name: string;
-  /** 입금 확인 완료 건수. 3건 미만이면 cold_start 정책값 사용(4-4) */
+  /** 지연일 계산 가능 완료 건수. 3건 미만이면 cold_start 정책값 사용(4-4) */
   completedCount: number;
   medianDelayDays: number | null;
   p90DelayDays: number | null;

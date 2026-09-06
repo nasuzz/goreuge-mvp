@@ -428,13 +428,15 @@ function recalculateClientStats(client: Client, completedContracts: Contract[]):
 ```
 
 `completedContracts`는 호출부가 이미 완료 상태로 필터링해 넘긴다는 전제다. `completedCount`는
-배열 길이 그대로 반영하고, `medianDelayDays`/`p90DelayDays`는 그중 `expectedDate`·`actualDate`가
-모두 있어 지연일을 계산할 수 있는 건이 `clientHistoryMinCount`(3) 미만이면 `completedCount`와
-무관하게 `null`이다. p90은 보간 없이 최근접 순위 방식(`ceil(n*0.9)`번째 값)을 쓴다.
+그중 `expectedDate`·`actualDate`가 모두 있어 지연일을 계산할 수 있는 완료 건수다.
+`medianDelayDays`/`p90DelayDays`와 같은 표본을 써야 한다. `scenarioDate.resolveDelay`가
+`completedCount >= clientHistoryMinCount`(3)인지로 `cold_start`와 `client_history`를 가르기
+때문이다. 지연일 계산 가능 건이 3건 미만이면 중앙값과 p90은 `null`이다. p90은 보간 없이
+최근접 순위 방식(`ceil(n*0.9)`번째 값)을 쓴다.
 
 ```
 지연일 = actualDate - expectedDate (음수면 0으로 clamp)
-completedCount = 완료 건수
+completedCount = 지연일을 계산할 수 있는 완료 건수
 medianDelayDays = 중앙값 (3건 미만이면 null)
 p90DelayDays    = 90퍼센타일 (3건 미만이면 null)
 ```
