@@ -8,7 +8,7 @@
 // localStorage 복원을 effect 안의 setState로 하면 렌더가 연쇄로 도는데,
 // 외부 저장소로 두면 구독 시점에 한 번만 복원하면 되기 때문이다.
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import {
   calculateExpectedDate,
   calculateExpectedNetAmount,
@@ -52,7 +52,6 @@ export interface OnboardingInput {
 export interface StoreSnapshot {
   input: EngineInput;
   summary: CashflowSummary;
-  recovery: RecoveryFinding;
   today: string;
   onboarded: boolean;
 }
@@ -66,7 +65,6 @@ function build(input: EngineInput, onboarded: boolean): StoreSnapshot {
   return {
     input: settled,
     summary: runAllScenarios(settled),
-    recovery: findRecovery(settled, NOW),
     today: TODAY,
     onboarded,
   };
@@ -319,6 +317,18 @@ export function useMockStore() {
     runWhatIf,
     reset,
   };
+}
+
+/**
+ * 협상 카드 (#50). 홈에서만 쓴다.
+ *
+ * build()에 넣어 스냅샷마다 미리 계산하면, 캘린더·정산함·위시함에서 계약을 바꿔도
+ * 쓰지 않을 결과를 매번 만든다. 실측하면 findRecovery는 runAllScenarios의 약 12배다
+ * (26.9ms vs 2.3ms). 그래서 쓰는 화면에서 input이 바뀔 때만 계산한다.
+ */
+export function useRecovery(): RecoveryFinding {
+  const { input } = useMockStore();
+  return useMemo(() => findRecovery(input, NOW), [input]);
 }
 
 /** 계약이 가진 거래처 이름을 찾는다. */

@@ -1,25 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { dateLabel, signedDays, won } from "@/lib/format";
 import type { RecoveryFinding, RecoveryOption } from "@/engine/index";
 
 type CopyState = "idle" | "copied" | "failed";
 
+/** 복사 결과 표시를 유지하는 시간. 지나면 버튼이 원래 문구로 돌아온다. */
+const COPY_FEEDBACK_MS = 2500;
+
 export function RecoveryCards({ finding }: { finding: RecoveryFinding }) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<CopyState>("idle");
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 표시를 되돌리지 않으면 한 번 복사한 카드가 계속 "복사됨"이라, 다시 복사할 수
+  // 있다는 게 보이지 않는다. 언마운트 시 남은 타이머를 정리한다.
+  useEffect(() => () => {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+  }, []);
+
+  function markCopyResult(key: string, state: CopyState) {
+    if (resetTimer.current) clearTimeout(resetTimer.current);
+    setCopiedKey(key);
+    setCopyState(state);
+    resetTimer.current = setTimeout(() => {
+      setCopiedKey(null);
+      setCopyState("idle");
+    }, COPY_FEEDBACK_MS);
+  }
 
   async function copy(option: RecoveryOption) {
     const draft = buildRequestDraft(option);
     try {
       await navigator.clipboard.writeText(draft);
-      setCopiedKey(option.assumption.label);
-      setCopyState("copied");
+      markCopyResult(option.assumption.label, "copied");
     } catch {
-      setCopiedKey(option.assumption.label);
-      setCopyState("failed");
+      // 클립보드 권한이 없거나 비보안 컨텍스트면 던진다. 문구는 화면에 이미 떠 있으니
+      // 사용자가 직접 복사할 수 있다는 것만 알린다.
+      markCopyResult(option.assumption.label, "failed");
     }
   }
 

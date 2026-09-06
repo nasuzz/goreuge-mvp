@@ -6,11 +6,14 @@ import { Badge, Card, EmptyState, Row, toneOfLevel } from "@/components/ui";
 import { RecoveryCards } from "@/components/recovery-cards";
 import { WhatIfPanel } from "@/components/what-if-panel";
 import { ddayLabel, dateLabel, longDateLabel, signedDays, won } from "@/lib/format";
-import { useMockStore } from "@/lib/mock/store";
+import { useMockStore, useRecovery } from "@/lib/mock/store";
 import type { CashflowResult } from "@/shared/types";
 
 export default function HomePage() {
-  const { summary, recovery, input, today, onboarded } = useMockStore();
+  const { summary, input, today, onboarded } = useMockStore();
+  // 협상 카드는 홈에서만 쓴다. 스냅샷에 미리 계산해 넣으면 다른 화면의 모든 액션이
+  // 쓰지 않을 결과를 계산한다(findRecovery는 runAllScenarios의 약 12배).
+  const recovery = useRecovery();
   const { baseline, optimistic, pessimistic, weekly, balanceBreakdown, riskCause } = summary;
 
   // 오늘의 예상잔액 등급. 캘린더 배경색과 같은 기준(엔진의 level)을 쓴다.
