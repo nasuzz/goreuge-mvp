@@ -16,6 +16,7 @@ type Expected = Pick<
 interface EvaluationCase {
   id: string;
   text: string;
+  tags: string[];
   expected: Expected;
 }
 
@@ -39,6 +40,10 @@ const failures: string[] = [];
 
 if (!dataset.synthetic) failures.push("데이터셋 synthetic 표기가 true가 아닙니다.");
 if (dataset.cases.length !== 20) failures.push(`평가 문장은 정확히 20건이어야 합니다. 현재 ${dataset.cases.length}건`);
+const unlabeledCases = dataset.cases.filter((testCase) =>
+  testCase.tags.some((tag) => tag.startsWith("unlabeled_client_")),
+);
+if (unlabeledCases.length < 5) failures.push(`무라벨 거래처 평가 문장은 최소 5건이어야 합니다. 현재 ${unlabeledCases.length}건`);
 
 for (const testCase of dataset.cases) {
   const { candidate } = parseContractDeterministically(testCase.text, { referenceDate: dataset.referenceDate });
@@ -76,6 +81,14 @@ async function main() {
   }
   if (!masked.maskedText.includes("[거래처]") || !masked.maskedText.includes("[계좌번호]") || !masked.maskedText.includes("2026년 9월 3일")) {
     failures.push("마스킹 placeholder 또는 계약 날짜 보존 결과가 올바르지 않습니다.");
+  }
+  const unlabeledSensitiveText = "K스튜디오 홍보영상 건 320만원으로 진행합니다. 납품은 2026년 9월 20일입니다.";
+  const unlabeledMasked = maskContractText(unlabeledSensitiveText);
+  if (unlabeledMasked.clientName !== "K스튜디오" || unlabeledMasked.maskedText.includes("K스튜디오")) {
+    failures.push("무라벨 거래처 후보가 외부 AI 전송 전에 마스킹되지 않았습니다.");
+  }
+  if (!unlabeledMasked.maskedText.includes("[거래처]")) {
+    failures.push("무라벨 거래처 마스킹 placeholder가 없습니다.");
   }
   const payerSensitiveText = "[D에이전시] 총액 2,400,000원, 실수령액 2,320,800원을 지급합니다. 우리은행 1002-123-456789";
   const payerMasked = maskContractText(payerSensitiveText);
@@ -145,6 +158,22 @@ async function main() {
   ).candidate;
   if (rateOnly.payerStatedNetAmountCandidate !== null) {
     failures.push("공제율만 있는 원문에서 지급처 안내 실수령액을 임의 생성했습니다.");
+  }
+
+  const naturalClient = parseContractDeterministically(
+    "K스튜디오 홍보영상 건 320만원으로 진행하시죠. 정산은 납품 후 30일이요.",
+    { referenceDate: dataset.referenceDate },
+  ).candidate;
+  if (naturalClient.clientName !== "K스튜디오" || naturalClient.confidence.clientName !== 0.7 || !naturalClient.needsReview) {
+    failures.push("무라벨 '<거래처> <작업명> 건' 문장을 낮은 confidence의 확인 후보로 만들지 못했습니다.");
+  }
+
+  const projectOnly = parseContractDeterministically(
+    "홍보영상 건 320만원으로 진행하시죠. 납품은 2026년 9월 20일이고 정산은 납품 후 30일이요.",
+    { referenceDate: dataset.referenceDate },
+  ).candidate;
+  if (projectOnly.clientName !== null) {
+    failures.push("거래처가 없는 '<작업명> 건' 문장에서 작업명을 거래처로 오인했습니다.");
   }
 
   const accuracy = total === 0 ? 0 : correct / total;
