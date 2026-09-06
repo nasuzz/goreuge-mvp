@@ -113,6 +113,22 @@ interface PayerNetExtraction {
  * 지급처가 금액으로 직접 안내한 실수령액만 후보화한다.
  * 공제율만 있는 문장은 의도적으로 null을 유지하며, 공제액 문구는 gross가 있을 때만 차감한다.
  */
+/**
+ * 지급처 안내 라벨 바로 뒤에 금액으로 보이는 표현이 있는지 본다(이슈 #41).
+ *
+ * 라벨 뒤 24자 안에 숫자나 한글 수사가 있고 `만`·`천`·`원` 같은 단위가 따라오면
+ * 금액을 안내한 문장으로 본다. 공제율만 적힌 "3.3% 공제 후 지급"류는 라벨
+ * 뒤에 금액 단위가 없어 걸리지 않는다.
+ */
+function hasUnparsedPayerAmountHint(text: string): boolean {
+  const label = /(?:실\s*수령(?:액)?|수령\s*예정\s*금액|입금\s*예정\s*금액|지급\s*예정\s*금액|공제액|차감액)/g;
+  for (const match of text.matchAll(label)) {
+    const after = text.slice((match.index ?? 0) + match[0].length, (match.index ?? 0) + match[0].length + 24);
+    if (/[0-9일이삼사오육칠팔구십백천]/.test(after) && /(만|천|원)/.test(after)) return true;
+  }
+  return false;
+}
+
 function extractPayerStatedNetAmount(
   text: string,
   grossAmount: number | null,
@@ -154,7 +170,26 @@ function extractPayerStatedNetAmount(
   }
 
   const value = directValue ?? deductedValue;
-  if (value === null) return { value: null, confidence: 1, needsResolution: false };
+  if (value === null) {
+    // [이슈 #41] "값 없음"과 "원문에 안내가 없다고 확신함"을 구분한다.
+    //
+    // 위 패턴은 순수 한글 수사(구십육만원) 또는 순수 아라비아 숫자(967,000원)만
+    // 받는다. "96만 7천원"처럼 둘을 섞은 표기는 매치 범위 밖이라 값이 null이
+    // 되는데, 여기서 무조건 confidence 1.0을 주면 확인 모달이 초록색 "확신도
+    // 100%"로 그려서 사용자가 그냥 넘어간다. 원문에 지급처가 알려준 금액이
+    // 적혀 있는데도 참조율 추정치로 계산되어, 이슈 #16이 payerStatedNetAmount를
+    // 따로 둔 이유가 무력화된다.
+    //
+    // 그래서 값 추출은 그대로 두고 confidence만 낮춘다(#41 선택지 2, A 제안).
+    // 지급처 안내 라벨 뒤에 금액 어휘가 있는데 후보를 하나도 못 뽑았다면
+    // "못 읽었을 가능성"이 높다고 보고 CONFIDENCE_THRESHOLD.warning(0.5)
+    // 아래로 내려 확인 모달에서 빨간 톤이 되게 한다.
+    if (hasUnparsedPayerAmountHint(text)) {
+      warnings.push("지급처가 안내한 금액으로 보이는 표현이 있지만 정확히 읽지 못했습니다. 직접 확인해 주세요.");
+      return { value: null, confidence: 0.3, needsResolution: false };
+    }
+    return { value: null, confidence: 1, needsResolution: false };
+  }
   if (!Number.isInteger(value) || value < 0 || (grossAmount !== null && value > grossAmount)) {
     warnings.push("지급처 안내 실수령액이 계약 총액 범위를 벗어나 사용자 확인이 필요합니다.");
     return { value: null, confidence: 0, needsResolution: true };
