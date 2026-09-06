@@ -167,6 +167,19 @@ run_prod() {
     exit 1
   fi
 
+  # 미로그인 상태에서는 `vercel env ls production`이 로그인 흐름으로 빠져
+  # 입력을 오래 기다릴 수 있다. timeout이 있는 환경에서는 인증 여부를 먼저
+  # 확인해 30초 안에 명확히 실패하게 한다.
+  if command -v timeout >/dev/null 2>&1; then
+    if ! timeout 30 "${VERCEL[@]}" whoami >/dev/null 2>&1; then
+      echo "오류: Vercel에 로그인돼 있지 않거나 CLI가 응답하지 않습니다." >&2
+      echo "  ${VERCEL[*]} login 후 다시 실행하세요." >&2
+      exit 1
+    fi
+  else
+    echo "경고: timeout 명령이 없어 Vercel 로그인 여부 사전 확인을 건너뜁니다." >&2
+  fi
+
   # [PR #44 리뷰 반영, lyoonji — P0] `vercel` CLI는 현재 디렉터리를 그대로
   # 업로드한다. web/에서 실행하면 web/만 올라가는데, 이 앱은 tsconfig의
   # `@/shared/*`·`@/engine/*`·`@/ai/*` 경로 별칭으로 저장소 루트의 ../src를
