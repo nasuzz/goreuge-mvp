@@ -18,5 +18,8 @@ export type { WhatIfAssumption, WhatIfResult } from "../shared/types";
 
 // [이슈 #14 추가]
 export { calculateExpectedDate } from "./expectedDate";
+export type { ExpectedDateOptions } from "./expectedDate";
+// [이슈 #57] 주말·공휴일 보정 (P1, 기본 OFF)
+export { isBusinessDay, nextBusinessDay } from "./businessDay";
 export { calculateExpectedNetAmount } from "./expectedNetAmount";
 export type { ExpectedNetAmountResult } from "./expectedNetAmount";

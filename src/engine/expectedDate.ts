@@ -7,14 +7,32 @@
 //   - expectedDateSource === "manual"인 계약을 이 함수 결과로 덮어쓰지 않는 건 호출부 책임이다
 //     (기획서 [확정 D1-a]: manual이면 엔진이 재계산으로 덮어쓰지 않는다).
 //     이 함수 자체는 그 판단을 하지 않고 settlementTerm 기준으로 항상 계산한다.
-//   - 주말·공휴일 보정은 P1이고 MVP는 OFF다(3-1). 계산된 날짜를 그대로 반환한다.
+//   - 주말·공휴일 보정은 P1이고 기본 OFF다(3-1). options.adjustToBusinessDay를 켤 때만
+//     다음 영업일로 민다. 기본값을 바꾸면 데모 검증값이 연쇄로 바뀐다 — 2026-10-31이
+//     토요일이라 NEXT_MONTH_END 예시가 11/2로 밀린다(이슈 #57).
 
 import type { Contract, DateString } from "../shared/types";
+import { nextBusinessDay } from "./businessDay";
+
+export interface ExpectedDateOptions {
+  /** true면 토·일·공휴일을 다음 영업일로 민다. 기본 false (3-1, 이슈 #57) */
+  adjustToBusinessDay?: boolean;
+}
 
 const MIN_SETTLEMENT_DAY = 1;
 const MAX_SETTLEMENT_DAY = 365;
 
 export function calculateExpectedDate(
+  contract: Pick<Contract, "settlementTerm" | "settlementDay" | "completionDate" | "invoiceDate">,
+  options: ExpectedDateOptions = {},
+): DateString | null {
+  const raw = calculateRawExpectedDate(contract);
+  if (raw === null) return null;
+  return options.adjustToBusinessDay ? nextBusinessDay(raw) : raw;
+}
+
+/** 보정 전 날짜. 정산조건 계산만 한다. */
+function calculateRawExpectedDate(
   contract: Pick<Contract, "settlementTerm" | "settlementDay" | "completionDate" | "invoiceDate">,
 ): DateString | null {
   switch (contract.settlementTerm) {
