@@ -22,6 +22,15 @@
 // 가장 이른 날짜를 고르면 "내일까지 300,000원 주세요"가 되는데 협상에서 쓸 수 없다.
 // 거래처에 하는 말은 "언제까지 주시면 됩니다"이므로, 금액을 정한 뒤 그 금액으로
 // 아직 효과가 있는 **가장 늦은 날짜**를 찾아 latestDate로 싣는다(이슈 #50 6절).
+//
+// [후보 선택 규칙 — (다) 가정별 비용 구조에 따라 다르게] (이슈 #50 최종 코멘트)
+// 세 가정은 "요구를 키울 때 드는 비용"이 다르다.
+//   - 선금: 비용(관계 부담)이 거의 안 는다 → 효과 기준(목표 일수를 넘기는 값)이 맞다.
+//   - 유출 연기: 비용(연체이자·수수료)이 는다 → 최소 기준(효과가 나는 최소값)이 맞다.
+//   - 지출 절감: 비용(생활 부담)이 는다 → 최소 기준이 맞다.
+// 셋을 하나의 목표 일수로 통일하면(구 (나)) 위험 전환 후 카드 연기처럼 "더 미뤄도
+// 효과가 안 느는" 구간에서 이득 없이 요구만 커지는 반례가 나온다(RECOVERY_TARGET_DAYS,
+// MINIMUM_EFFECTIVE_TARGET 주석 참조).
 
 import type {
   EngineInput, WhatIfAssumption, DateString, DateTimeString, Won,
@@ -68,11 +77,11 @@ const DELAY_DAYS: number[] = [7, 14, 21, 30];
 const REDUCE_AMOUNTS: Won[] = [50_000, 100_000, 200_000, 300_000, 500_000];
 
 /**
- * "최소 조건"을 곧이곧대로 "효과가 1일이라도 나는 가장 작은 값"으로 잡으면 협상
- * 카드로 못 쓴다 — mock 기준 상태에서 그렇게 고르면 "선금 100,000원 -> +3일"이
+ * "최소 조건"을 곧이곧대로 "효과가 1일이라도 나는 가장 작은 값"으로 잡으면 선금은
+ * 협상 카드가 안 된다 — mock 기준 상태에서 그렇게 고르면 "선금 100,000원 -> +3일"이
  * 나온다. 거래처에 전화해서 요구할 만한 크기가 아니다.
  *
- * 그래서 먼저 "일주일은 벌어주는" 값을 찾고, 사다리 안에 그런 값이 없을 때만
+ * 그래서 선금은 먼저 "일주일은 벌어주는" 값을 찾고, 사다리 안에 그런 값이 없을 때만
  * 효과가 나는 최소값으로 물러난다. 일주일인 이유는 이슈 #50 프로토타입 실측이
  * 그 근처에 몰려 있어서다(기준 상태 300,000원 -> +8일, 위험 전환 후
  * 800,000원 -> +7일). 물러난 경우는 rationale에 그대로 밝힌다.
@@ -80,19 +89,34 @@ const REDUCE_AMOUNTS: Won[] = [50_000, 100_000, 200_000, 300_000, 500_000];
 const RECOVERY_TARGET_DAYS = 7;
 
 /**
+ * 유출 연기·지출 절감은 목표 일수를 적용하지 않고 효과가 나는 최소값을 그대로
+ * 쓴다(이슈 #50 최종 코멘트, "미시/거시" 실측). 세 가정의 "요구를 키울 때 드는
+ * 비용" 구조가 다르기 때문이다.
+ *   - 선금: 요구를 키워도 비용(관계 부담)이 거의 늘지 않는다 → 효과 기준(목표 적용)이 맞다.
+ *   - 유출 연기: 더 미룰수록 연체이자·수수료가 는다 → 최소 기준이 맞다.
+ *   - 지출 절감: 더 줄일수록 생활 부담이 는다 → 최소 기준이 맞다.
+ * 실측으로 확인된 반례: 위험 전환 후 카드 연기는 7일이든 30일이든 delta가 똑같이
+ * +6일이다. 이때 목표(7일) 규칙을 적용하면 이득 없이 요구만 30일로 커진다.
+ * `pickFromLadder`에 target=0을 넘기면 첫 양수 델타에서 바로 멈추므로 최소값이 된다.
+ */
+const MINIMUM_EFFECTIVE_TARGET = 0;
+
+/**
  * 사다리를 오름차순으로 훑어 (1) 목표 일수를 넘기는 첫 값, (2) 없으면 효과가
  * 나는 첫 값을 고른다. 사다리가 상수라 결과는 결정적이다.
+ * target에 0을 넘기면 첫 양수 델타에서 즉시 멈추므로 "최소 효과값" 선택이 된다.
  */
 function pickFromLadder<T>(
   ladder: T[],
   deltaOf: (candidate: T) => number,
+  target: number = RECOVERY_TARGET_DAYS,
 ): { picked: T; delta: number; reachedTarget: boolean } | null {
   let fallback: { picked: T; delta: number } | null = null;
   for (const candidate of ladder) {
     const delta = deltaOf(candidate);
     if (delta <= 0) continue;
     if (fallback === null) fallback = { picked: candidate, delta };
-    if (delta >= RECOVERY_TARGET_DAYS) {
+    if (delta >= target) {
       return { picked: candidate, delta, reachedTarget: true };
     }
   }
@@ -248,22 +272,23 @@ function findDelayOutflow(
     .sort((a, b) => b.amount - a.amount || a.id.localeCompare(b.id));
 
   // 후보마다 "효과가 나는 최소 연기일"을 구한 뒤 그중 하나를 고른다.
+  // 유출 연기는 목표(7일)를 적용하지 않는다 — 더 미룰수록 연체이자·수수료가 늘어서
+  // 최소값이 맞다(MINIMUM_EFFECTIVE_TARGET 주석).
   const evaluated = candidates
     .map((outflow) => {
       const picked = pickFromLadder(DELAY_DAYS, (days) =>
-        evaluate(delayAssumption(outflow, days)).dayDelta);
+        evaluate(delayAssumption(outflow, days)).dayDelta, MINIMUM_EFFECTIVE_TARGET);
       return picked === null ? null : { outflow, ...picked };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
   if (evaluated.length === 0) return null;
 
-  // 선택 규칙: (1) 목표 일수를 넘기는 것 우선, (2) 연기 일수가 짧을수록 좋다
-  // — 거래처·카드사에 요구하는 폭이 작다, (3) 그래도 같으면 효과가 큰 쪽,
-  // (4) 마지막은 id로 고정해 결정성을 보장한다.
+  // 선택 규칙: (1) 연기 일수가 짧을수록 좋다 — 거래처·카드사에 요구하는 폭이
+  // 작다, (2) 그래도 같으면 효과가 큰 쪽, (3) 마지막은 id로 고정해 결정성을 보장한다.
+  // (모든 후보가 최소값 기준으로 뽑히므로 reachedTarget으로 우선순위를 나눌 필요가 없다.)
   evaluated.sort((a, b) =>
-    Number(b.reachedTarget) - Number(a.reachedTarget)
-    || a.picked - b.picked
+    a.picked - b.picked
     || b.delta - a.delta
     || a.outflow.id.localeCompare(b.outflow.id));
 
@@ -310,8 +335,10 @@ function delayAssumption(
 function findReduceSpending(
   evaluate: (a: WhatIfAssumption) => Evaluation,
 ): RecoveryOption | null {
+  // 지출 절감도 목표(7일)를 적용하지 않는다 — 더 줄일수록 생활 부담이 거의
+  // 비례해서 늘어서 최소값이 맞다(MINIMUM_EFFECTIVE_TARGET 주석).
   const chosen = pickFromLadder(REDUCE_AMOUNTS, (amount) =>
-    evaluate(reduceAssumption(amount)).dayDelta);
+    evaluate(reduceAssumption(amount)).dayDelta, MINIMUM_EFFECTIVE_TARGET);
   if (chosen === null) return null;
 
   {

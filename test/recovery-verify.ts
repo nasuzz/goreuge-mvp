@@ -111,12 +111,15 @@ function snapshot(input: EngineInput) {
   };
 }
 
+// 선금은 목표(7일) 적용, 유출 연기·지출 절감은 최소 효과값(#50 최종 코멘트,
+// "미시/거시" 실측 — 세 가정의 비용 구조가 다르다). 통일 규칙(구 (나))이었다면
+// 카드 연기 30일(+14일)·지출 절감 300,000원(+10일)이 나왔을 것이다.
 check("기준 상태 탐색 결과", snapshot(BASE), {
   dDay: "2026-09-30",
   options: [
-    { type: "delay_outflow", label: "신용카드 결제 30일 연기", dayDelta: 14, latestDate: null, dDayAfter: "2026-10-14" },
-    { type: "reduce_spending", label: "월 지출 300,000원 절감", dayDelta: 10, latestDate: null, dDayAfter: "2026-10-10" },
     { type: "advance_payment", label: "선금 300,000원", dayDelta: 8, latestDate: "2026-09-30", dDayAfter: "2026-10-08" },
+    { type: "delay_outflow", label: "신용카드 결제 21일 연기", dayDelta: 5, latestDate: null, dDayAfter: "2026-10-05" },
+    { type: "reduce_spending", label: "월 지출 50,000원 절감", dayDelta: 1, latestDate: null, dDayAfter: "2026-10-01" },
   ],
   emptyReason: null,
 });
