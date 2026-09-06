@@ -21,6 +21,7 @@ import {
 } from "@/engine/index";
 import { normalizeClientName } from "@/lib/client-name";
 import { MOCK_ENGINE_INPUT, TODAY } from "@/shared/mock-data";
+import { getWithholdingReference } from "@/shared/policy";
 import type {
   CashflowSummary,
   Client,
@@ -172,7 +173,9 @@ export function addContract(values: ContractCreateInput): Contract {
     actualDate: null,
     incomeType: values.incomeType,
     classificationStatus: values.classificationStatus,
-    referenceRate: null,
+    // [PR #25 리뷰 - A] #21 API 라우트(reference_rate)와 같은 값을 저장한다. 계산에는 안 쓰이지만
+    // (expectedNetAmount.ts 5-1) "저장 당시 시스템 참조 공제율" 감사 필드라 Mock도 비워두면 안 된다.
+    referenceRate: getWithholdingReference(values.incomeType).referenceRate,
     confirmedExpectedRate: values.confirmedExpectedRate,
     actualRate: null,
     payerStatedNetAmount: values.payerStatedNetAmount,
