@@ -47,6 +47,7 @@ const INCOME_TYPES: { value: IncomeType; label: string }[] = [
 ];
 
 const NEEDS_DAY: SettlementTerm[] = ["NEXT_MONTH_DAY", "NET_DAYS"];
+const NEEDS_MANUAL_DATE: Array<SettlementTerm | null> = [null, "UNKNOWN"];
 
 export function AIConfirmModal({
   initial,
@@ -89,8 +90,8 @@ export function AIConfirmModal({
   }
 
   const { candidate, fields, gate } = model;
-  const needsManualDate =
-    !candidate.settlementTerm || candidate.settlementTerm === "UNKNOWN";
+  const needsManualDate = NEEDS_MANUAL_DATE.includes(candidate.settlementTerm);
+  const effectiveManualExpectedDate = needsManualDate ? manualExpectedDate : "";
 
   return (
     <div
@@ -197,9 +198,17 @@ export function AIConfirmModal({
             <select
               aria-label={FIELD_LABEL.settlementTerm}
               value={candidate.settlementTerm ?? "UNKNOWN"}
-              onChange={(e) =>
-                update({ settlementTerm: e.target.value as SettlementTerm })
-              }
+              onChange={(e) => {
+                const settlementTerm = e.target.value as SettlementTerm;
+                if (!NEEDS_MANUAL_DATE.includes(settlementTerm)) {
+                  setManualExpectedDate("");
+                }
+                update(
+                  { settlementTerm },
+                  reviewed,
+                  NEEDS_MANUAL_DATE.includes(settlementTerm) ? manualExpectedDate : "",
+                );
+              }}
               className={inputClass}
             >
               {TERMS.map((term) => (
@@ -293,7 +302,7 @@ export function AIConfirmModal({
           <button
             type="button"
             disabled={!gate.canSave}
-            onClick={() => onApply(candidate, manualExpectedDate || null)}
+            onClick={() => onApply(candidate, effectiveManualExpectedDate || null)}
             className="flex-1 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40"
           >
             확인한 값으로 폼 채우기
