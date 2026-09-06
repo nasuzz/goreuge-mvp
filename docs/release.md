@@ -31,8 +31,11 @@ DRI: C. 검수: A·B.
 | `SUPABASE_SECRET_KEY` | A가 공유한 값 | `NEXT_PUBLIC_` 접두사 금지 (D5-a) |
 | `DEMO_USER_ID` | `a0000000-0000-4000-8000-000000000001` | **아래 경고 참고** |
 | `DEMO_TODAY` | `2026-09-01` | 비우면 실제 KST 날짜를 쓴다 |
-| `OPENAI_API_KEY` | B가 공유한 값 | #27·#29 머지 후 |
-| `OPENAI_MODEL` | `gpt-5.4-mini` | #27·#29 머지 후 |
+| `GEMINI_API_KEY` | B가 Google AI Studio에서 만든 값 | 서버 전용, `NEXT_PUBLIC_` 접두사 금지 |
+| `GEMINI_MODEL` | `gemini-3-flash-preview` | Gemini 무료 tier 대상 모델. 필요 시 교체 |
+
+PR Preview URL 대상으로 `test/api-smoke.mjs`를 돌릴 때는 같은 값을 Preview 환경에도 넣는다.
+Production에만 넣으면 Preview 배포 자체는 성공해도 API route가 500을 반환한다.
 
 > **`DEMO_USER_ID`를 반드시 넣을 것.** 미설정 시 API 라우트가 "가장 먼저 온보딩한
 > 사용자"를 고르는데, 현재 DB에는 데모 계정 외에 2026-09-03에 생성된 계정이 하나 더
@@ -141,7 +144,7 @@ node db/seed-demo.mjs > db/seed-demo.sql
 
 ```bash
 git fetch origin
-git grep -nIE "(eyJ[A-Za-z0-9_-]{30,})|(sk-[A-Za-z0-9]{20,})|(sb_secret_[A-Za-z0-9_-]{10,})|(service_role)|(-----BEGIN [A-Z ]*PRIVATE KEY)" origin/main -- . ':!*.lock' ':!package-lock.json'
+git grep -nIE "(eyJ[A-Za-z0-9_-]{30,})|(sk-[A-Za-z0-9]{20,})|(AIza[A-Za-z0-9_-]{20,})|(sb_secret_[A-Za-z0-9_-]{10,})|(service_role)|(-----BEGIN [A-Z ]*PRIVATE KEY)" origin/main -- . ':!*.lock' ':!package-lock.json' ':!docs/release.md' ':!scripts/deploy.sh'
 git ls-tree -r --name-only origin/main | grep -E "\.env"
 git log --all --diff-filter=A --name-only --format="" | sort -u | grep -E "\.env($|\.local|\.production)"
 git grep -nIE "01[0-9]-[0-9]{3,4}-[0-9]{4}|[A-Za-z0-9._%+-]+@(gmail|naver|daum|kakao|hanmail)\.[a-z]{2,3}" origin/main -- . ':!*.lock' ':!package-lock.json'
