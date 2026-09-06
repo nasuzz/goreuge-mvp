@@ -111,12 +111,15 @@ function snapshot(input: EngineInput) {
   };
 }
 
+// 선택 정책(#50): 선금은 효과 기준(7일까지 올림), 유출 연기·지출 절감은 최소 기준.
+// 그래서 카드 연기는 +14일이 나오는 30일이 아니라 하한을 처음 넘긴 21일(+5일)을,
+// 지출 절감은 +1일짜리 50,000원이 아니라 100,000원(+3일)을 고른다.
 check("기준 상태 탐색 결과", snapshot(BASE), {
   dDay: "2026-09-30",
   options: [
-    { type: "delay_outflow", label: "신용카드 결제 30일 연기", dayDelta: 14, latestDate: null, dDayAfter: "2026-10-14" },
-    { type: "reduce_spending", label: "월 지출 300,000원 절감", dayDelta: 10, latestDate: null, dDayAfter: "2026-10-10" },
     { type: "advance_payment", label: "선금 300,000원", dayDelta: 8, latestDate: "2026-09-30", dDayAfter: "2026-10-08" },
+    { type: "delay_outflow", label: "신용카드 결제 21일 연기", dayDelta: 5, latestDate: null, dDayAfter: "2026-10-05" },
+    { type: "reduce_spending", label: "월 지출 100,000원 절감", dayDelta: 3, latestDate: null, dDayAfter: "2026-10-03" },
   ],
   emptyReason: null,
 });
@@ -243,7 +246,52 @@ check(
   "200,000원이 2026-10-05까지 들어오면 90일 안에서는 D-day가 사라져요.",
 );
 
-console.log("\n── 6. 결정성 ──────────────────────────────────────");
+console.log("\n── 6. 선택 정책이 실제로 다르게 동작하는가 (#50) ───");
+
+// 세 가정은 "요구를 키울 때 드는 비용"이 달라 선택 기준을 달리 뒀다.
+// 그 차이가 출력에 실제로 나타나는지 고정한다. 통일 기준으로 되돌리면 깨진다.
+{
+  const finding = findRecovery(BASE, NOW);
+  const advanceOpt = finding.options.find((o) => o.assumption.type === "advance_payment");
+  const delayOpt = finding.options.find((o) => o.assumption.type === "delay_outflow");
+  const reduceOpt = finding.options.find((o) => o.assumption.type === "reduce_spending");
+
+  // 선금: 효과 기준. 100,000원(+3일)도 하한은 넘지만 7일 목표까지 올려 300,000원(+8일)을 고른다.
+  check("선금은 하한을 넘는 최소값이 아니라 목표(7일)를 넘는 값을 고른다", advanceOpt?.dayDelta, 8);
+  check("선금 하한값 100,000원도 효과는 있다(그래도 안 고른다)", delta(BASE, advance(100_000, "2026-09-02")), 3);
+
+  // 유출 연기: 최소 기준. 30일이면 +14일이지만 21일(+5일)에서 멈춘다 — 더 미루면 이자를 낸다.
+  check("유출 연기는 효과가 더 큰 30일이 아니라 하한을 넘긴 21일을 고른다", delayOpt?.dayDelta, 5);
+  check("30일을 미루면 실제로 효과는 더 크다(그래도 안 고른다)", delta(BASE, {
+    type: "delay_outflow", label: "신용카드 결제", outflowId: "outflow-002", newDate: addDays("2026-09-14", 30),
+  }), 14);
+
+  // 지출 절감: 최소 기준 + 하한. 50,000원(+1일)은 하한 미달이라 후보에서 빠진다.
+  check("지출 절감에서 +1일짜리(50,000원)는 후보가 아니다", reduceOpt?.dayDelta, 3);
+  check("50,000원도 효과 자체는 있다(하한 미달이라 뺀 것)", delta(BASE, {
+    type: "reduce_spending", label: "월 지출 절감", monthlyReduction: 50_000,
+  }), 1);
+
+  check("모든 옵션이 하한(3일) 이상", finding.options.every((o) => o.dayDelta >= 3), true);
+}
+
+console.log("\n── 7. 이분 탐색의 전제 — 단조성 ───────────────────");
+
+// findLatestEffectiveDate는 "같은 금액이면 늦게 들어올수록 효과가 같거나 작다"에
+// 기대어 이분 탐색을 한다. 이게 깨지면 latestDate가 조용히 틀린 날짜가 된다.
+// 엔진이 바뀌어도 전제가 유지되는지 여기서 잡는다.
+for (const [name, input] of [["기준", BASE], ["위험 전환 후", RISKY]] as const) {
+  for (const amount of [100_000, 300_000, 800_000, 1_500_000, 3_000_000]) {
+    const series: number[] = [];
+    for (let offset = 1; offset <= 60; offset += 1) {
+      series.push(delta(input, advance(amount, addDays("2026-09-01", offset))));
+    }
+    const rising = series.filter((v, i) => i > 0 && v > series[i - 1]).length;
+    check(`${name} ${amount.toLocaleString("ko-KR")}원: 날짜가 늦어질수록 효과가 늘지 않는다`, rising, 0);
+  }
+}
+
+console.log("\n── 8. 결정성 ──────────────────────────────────────");
 check(
   "같은 입력이면 항상 같은 결과",
   JSON.stringify(findRecovery(RISKY, NOW)),

@@ -68,31 +68,58 @@ const DELAY_DAYS: number[] = [7, 14, 21, 30];
 const REDUCE_AMOUNTS: Won[] = [50_000, 100_000, 200_000, 300_000, 500_000];
 
 /**
- * "최소 조건"을 곧이곧대로 "효과가 1일이라도 나는 가장 작은 값"으로 잡으면 협상
- * 카드로 못 쓴다 — mock 기준 상태에서 그렇게 고르면 "선금 100,000원 -> +3일"이
- * 나온다. 거래처에 전화해서 요구할 만한 크기가 아니다.
+ * [선택 정책 — 이슈 #50 실측 근거]
  *
- * 그래서 먼저 "일주일은 벌어주는" 값을 찾고, 사다리 안에 그런 값이 없을 때만
- * 효과가 나는 최소값으로 물러난다. 일주일인 이유는 이슈 #50 프로토타입 실측이
- * 그 근처에 몰려 있어서다(기준 상태 300,000원 -> +8일, 위험 전환 후
- * 800,000원 -> +7일). 물러난 경우는 rationale에 그대로 밝힌다.
+ * 세 가정은 "요구를 키울 때 드는 비용"의 성격이 다르다. 그래서 하나의 목표
+ * 일수로 통일하면 둘 중 하나는 반드시 틀린다.
+ *
+ *   선금      요구를 키워도 비용이 거의 안 는다. 전화 한 통과 관계 부담은
+ *             100,000원이든 300,000원이든 같다. 오히려 너무 적게 부르는 게
+ *             손해다 — 총액 2,400,000원짜리 계약에 100,000원(4%)을 달라는 건
+ *             같은 관계 자본을 쓰고 3일밖에 못 사는 요청이다.
+ *             -> 효과 기준. ADVANCE_TARGET_DAYS까지 올린다.
+ *
+ *   유출 연기 연기 일수가 곧 비용이다(연체이자·수수료·신용). 실측에서 위험
+ *             전환 후 카드 연기는 7일이든 30일이든 똑같이 +6일이었다. 여기서
+ *             30일을 고르면 아무 이득 없이 요구만 키우는 것이다.
+ *             -> 최소 기준.
+ *
+ *   지출 절감 절감액에 생활 부담이 거의 비례한다.
+ *             -> 최소 기준.
+ *
+ * 한 줄로: **더 요구해도 비용이 안 느는 건 효과 기준, 요구할수록 비용이 느는
+ * 건 최소 기준.**
  */
-const RECOVERY_TARGET_DAYS = 7;
+const ADVANCE_TARGET_DAYS = 7;
 
 /**
- * 사다리를 오름차순으로 훑어 (1) 목표 일수를 넘기는 첫 값, (2) 없으면 효과가
- * 나는 첫 값을 고른다. 사다리가 상수라 결과는 결정적이다.
+ * 종류와 무관한 하한. 하루 이틀짜리는 협상 카드가 되지 않는다 — "월 지출
+ * 50,000원을 줄이면 하루 벌어요"는 전화를 걸거나 생활을 바꿀 이유가 못 된다.
+ * 게다가 실측상 효율도 가장 나빴다(50,000원/일, 사다리 최악).
+ *
+ * 선택 규칙이 아니라 화면 하한으로 두는 방법도 있지만, 그러면 엔진이 "쓸 수
+ * 없는 카드"를 만들어 놓고 화면이 지우는 구조가 된다. 애초에 후보가 아니라고
+ * 보는 편이 설명하기 쉽다.
+ */
+const MIN_MEANINGFUL_DAYS = 3;
+
+/**
+ * 사다리를 오름차순으로 훑어 (1) targetDays를 넘기는 첫 값, (2) 없으면 하한을
+ * 넘긴 첫 값을 고른다. targetDays에 MIN_MEANINGFUL_DAYS를 넘기면 "하한을 넘긴
+ * 최소값"이 되고, 더 큰 값을 넘기면 "그만큼 벌어주는 최소값"이 된다.
+ * 사다리가 상수라 결과는 결정적이다.
  */
 function pickFromLadder<T>(
   ladder: T[],
   deltaOf: (candidate: T) => number,
+  targetDays: number,
 ): { picked: T; delta: number; reachedTarget: boolean } | null {
   let fallback: { picked: T; delta: number } | null = null;
   for (const candidate of ladder) {
     const delta = deltaOf(candidate);
-    if (delta <= 0) continue;
+    if (delta < MIN_MEANINGFUL_DAYS) continue;
     if (fallback === null) fallback = { picked: candidate, delta };
-    if (delta >= RECOVERY_TARGET_DAYS) {
+    if (delta >= targetDays) {
       return { picked: candidate, delta, reachedTarget: true };
     }
   }
@@ -130,7 +157,7 @@ export function findRecovery(input: EngineInput, now: DateTimeString): RecoveryF
     options: trimmed,
     emptyReason: trimmed.length > 0
       ? null
-      : "지금 조건으로는 D-day를 되돌리는 방법을 찾지 못했어요. 금액을 더 올리거나 다른 유출을 조정해 보세요.",
+      : `지금 조건으로는 D-day를 ${MIN_MEANINGFUL_DAYS}일 이상 되돌리는 방법을 찾지 못했어요. 금액을 더 올리거나 다른 유출을 조정해 보세요.`,
   };
 }
 
@@ -166,9 +193,9 @@ function findAdvancePayment(
 ): RecoveryOption | null {
   const earliest = addDays(input.today, 1);
 
-  // 요구 금액은 작을수록 좋지만, 너무 작으면 협상 카드가 안 된다(RECOVERY_TARGET_DAYS 주석).
+  // 선금은 요구를 키워도 비용이 거의 안 늘어난다 -> 효과 기준(선택 정책 주석).
   const chosen = pickFromLadder(ADVANCE_AMOUNTS, (amount) =>
-    evaluate(advanceAssumption(amount, earliest)).dayDelta);
+    evaluate(advanceAssumption(amount, earliest)).dayDelta, ADVANCE_TARGET_DAYS);
   if (chosen === null) return null;
   const chosenAmount = chosen.picked;
 
@@ -250,8 +277,9 @@ function findDelayOutflow(
   // 후보마다 "효과가 나는 최소 연기일"을 구한 뒤 그중 하나를 고른다.
   const evaluated = candidates
     .map((outflow) => {
+      // 연기 일수가 곧 비용이다 -> 최소 기준(하한만 넘기면 바로 채택).
       const picked = pickFromLadder(DELAY_DAYS, (days) =>
-        evaluate(delayAssumption(outflow, days)).dayDelta);
+        evaluate(delayAssumption(outflow, days)).dayDelta, MIN_MEANINGFUL_DAYS);
       return picked === null ? null : { outflow, ...picked };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -310,8 +338,9 @@ function delayAssumption(
 function findReduceSpending(
   evaluate: (a: WhatIfAssumption) => Evaluation,
 ): RecoveryOption | null {
+  // 절감액에 생활 부담이 비례한다 -> 최소 기준.
   const chosen = pickFromLadder(REDUCE_AMOUNTS, (amount) =>
-    evaluate(reduceAssumption(amount)).dayDelta);
+    evaluate(reduceAssumption(amount)).dayDelta, MIN_MEANINGFUL_DAYS);
   if (chosen === null) return null;
 
   {
