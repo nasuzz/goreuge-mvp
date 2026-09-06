@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { buildOutflowSchedule } from "@/engine/index";
 import { Card, PageTitle } from "@/components/ui";
 import { longDateLabel, won } from "@/lib/format";
 import { useMockStore } from "@/lib/mock/store";
@@ -56,15 +57,30 @@ export default function CalendarPage() {
     return map;
   }, [baseline.inflows]);
 
-  /** 이름이 필요한 화면이라 outflow를 날짜에 직접 맞춰본다. 금액 합계는 엔진 값을 쓴다. */
+  /**
+   * 유출 이름을 붙일 날짜는 엔진이 실제로 펼친 날짜를 그대로 쓴다.
+   *
+   * 예전에는 화면에서 "일(day)"만 비교했는데, buildOutflowSchedule은 매월 반복
+   * 유출을 그 달 마지막 날로 clamp한다(31일 지출 → 30일까지인 달에는 30일).
+   * 그래서 말일 지출이 있으면 금액은 뜨는데 이름만 사라지는 달이 생겼다.
+   * outflow 하나씩 엔진에 넣어 발생일을 받아오면 clamp 규칙이 그대로 따라온다.
+   */
+  const outflowNamesByDate = useMemo(() => {
+    const map = new Map<string, string[]>();
+    const start = baseline.projections[0]?.date ?? today;
+    const horizonDays = baseline.projections.length;
+    if (horizonDays === 0) return map;
+    for (const outflow of input.outflows) {
+      if (outflow.includedInBaseline) continue;
+      for (const date of Object.keys(buildOutflowSchedule([outflow], start, horizonDays))) {
+        map.set(date, [...(map.get(date) ?? []), outflow.name]);
+      }
+    }
+    return map;
+  }, [input.outflows, baseline.projections, today]);
+
   function outflowNames(date: string): string[] {
-    const day = Number(date.slice(8, 10));
-    return input.outflows
-      .filter((o) => !o.includedInBaseline)
-      .filter((o) =>
-        o.recurrence === "once" ? o.dueDate === date : Number(o.dueDate.slice(8, 10)) === day,
-      )
-      .map((o) => o.name);
+    return outflowNamesByDate.get(date) ?? [];
   }
 
   const selectedProjection = byDate.get(selected) ?? null;

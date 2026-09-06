@@ -66,6 +66,16 @@ export function isCandidateFieldMissing(
       );
     case "incomeTypeCandidate":
       return candidate.incomeTypeCandidate === "needs_review";
+    case "payerStatedNetAmountCandidate":
+      // [#19] 이 필드는 "값이 없다 = 누락"이 아니다. 원문에 지급처 안내가 아예
+      // 없으면 candidate=null + confidence=1.0이고, 그건 정상이라 저장을 막지
+      // 않는다. 안내 금액이 서로 충돌하거나 총액 범위를 벗어나 계산이 불가능한
+      // 경우에만 confidence=0으로 내려오고, 그때만 사용자 확인이 필요하다.
+      // 사용자가 모달에서 금액을 직접 넣으면 해소된 것으로 본다.
+      return (
+        candidate.payerStatedNetAmountCandidate === null &&
+        candidate.confidence.payerStatedNetAmountCandidate === 0
+      );
     default:
       return false;
   }

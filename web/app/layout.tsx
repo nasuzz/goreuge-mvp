@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/nav-bar";
+import { FIXED_COPY } from "@/shared/policy";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +29,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pb-28 pt-6 sm:px-6">
           {children}
+          {/* 기획서 13장 고지. 온보딩 한 화면에만 두면 데모처럼 곧바로 홈으로
+              들어가는 경로에서는 한 번도 노출되지 않는다. 문구는 임의로 바꾸지
+              않고 policy.ts의 FIXED_COPY를 그대로 쓴다. */}
+          <footer className="mt-8 border-t border-line pt-3 text-xs leading-relaxed text-muted">
+            {FIXED_COPY.serviceDisclaimer}
+          </footer>
         </div>
         <NavBar />
       </body>
