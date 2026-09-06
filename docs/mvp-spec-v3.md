@@ -467,11 +467,13 @@ reserved_amount 감소
 {
   "client_name": null,
   "gross_amount": 2400000,
+  "payer_stated_net_amount_candidate": null,
   "completion_date": "2026-09-03",
   "settlement_term": "NEXT_MONTH_END",
   "income_type_candidate": "needs_review",
   "confidence": {
     "gross_amount": 0.98,
+    "payer_stated_net_amount_candidate": 1.0,
     "completion_date": 0.96,
     "settlement_term": 0.91,
     "income_type_candidate": 0.31
@@ -486,6 +488,7 @@ reserved_amount 감소
 - 거래처 실명·계좌번호는 마스킹 후 전송한다.
 - AI가 소득유형을 최종 판정하지 않는다.
 - 사용자 확인 전 DB에 계약을 저장하지 않는다.
+- 지급처 안내 실수령액 후보는 원문에 금액이 명시된 경우에만 생성하고 사용자가 확인한다.
 - 예정입금일과 금액은 결정론 엔진에서 계산한다.
 
 ### 8-2. 보조 AI
