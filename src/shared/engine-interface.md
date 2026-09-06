@@ -429,6 +429,15 @@ function applySavingsCheck(
 구매 완료:  reservedAmount 감소, 실제 구매 유출 증가, 동일 금액이면 D-day 변화 없음
 ```
 
+**[PR #64 리뷰 반영, lyoonji]**
+- 위 "적립 상태 전이"는 `Saving`의 금액 필드(`plannedAmount`/`reservedAmount`/`spentAmount`)
+  이야기다. `Saving.status`(`SavingsStatus` enum)는 이 절 어디에도 전이 규칙이 없다 —
+  `applySavingsCheck`는 `status`를 건드리지 않는다. 화면은 `status`가 아니라
+  `reservedAmount`/`plannedAmount` 값으로 적립 중/완료 여부를 판단해야 한다.
+- "구매 완료" 전이(`reservedAmount` 감소, `spentAmount` 증가)는 **이슈 #56 범위 밖**이다
+  — "A가 P1에서 추가로 할 일" 목록(아래)에 `calculateWishPlan`·`applySavingsCheck`만
+  있고 이 전이는 없다. 필요해지면 별도 이슈로 뺀다.
+
 **A가 P1에서 추가로 할 일**
 1. `simulationStartBalance`에 `reservedAmount` 실제 반영 (공식은 이미 있음)
 2. `plannedAmount`를 예정일의 미래 유출로 반영 (이중 차감 금지)
